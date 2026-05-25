@@ -15,7 +15,6 @@
     "mqtt": "^5.3.0"
   },
   "devDependencies": {
-    "@servl/shared": "*",
     "typescript": "^5.3.3",
     "@types/node": "^20.11.5",
     "@types/express": "^4.17.21",
