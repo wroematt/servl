@@ -1,0 +1,15 @@
+{
+  "name": "servl",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "shared",
+    "services/api-gateway",
+    "services/user-service",
+    "services/pet-service",
+    "services/device-service",
+    "services/feed-service",
+    "services/notification-service",
+    "worker"
+  ]
+}

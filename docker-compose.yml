@@ -1,7 +1,7 @@
 version: "3.9"
 
 # ─────────────────────────────────────────────
-#  PetFeeder — Docker Compose (Raspberry Pi)
+#  Servl — Docker Compose (Raspberry Pi)
 #  All services run on a single Pi 4 (4 GB).
 #  For cloud migration: each service can be
 #  extracted to its own compose file or k8s pod.
@@ -56,17 +56,14 @@ services:
   # ── API GATEWAY ────────────────────────────
   api-gateway:
     build:
-      context: ./services/api-gateway
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
     container_name: pf_api_gateway
     restart: unless-stopped
     environment:
       - NODE_ENV=production
       - PORT=3000
       - JWT_SECRET=${JWT_SECRET}
-      - JWT_EXPIRES_IN=15m
-      - REFRESH_TOKEN_EXPIRES_IN=30d
-      - REDIS_URL=redis://redis:6379
       - USER_SERVICE_URL=http://user-service:3001
       - PET_SERVICE_URL=http://pet-service:3002
       - DEVICE_SERVICE_URL=http://device-service:3003
@@ -75,7 +72,6 @@ services:
     networks:
       - internal
     depends_on:
-      - redis
       - user-service
       - pet-service
       - device-service
@@ -85,22 +81,26 @@ services:
   # ── USER & AUTH SERVICE ────────────────────
   user-service:
     build:
-      context: ./services/user-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/user-service/Dockerfile
     container_name: pf_user_service
     restart: unless-stopped
     environment:
       - NODE_ENV=production
       - PORT=3001
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=15m
+      - REFRESH_TOKEN_EXPIRES_IN=30d
+      - DOMAIN=${DOMAIN}
       - SMTP_HOST=${SMTP_HOST}
       - SMTP_PORT=${SMTP_PORT}
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASS=${SMTP_PASS}
       - EMAIL_FROM=${EMAIL_FROM}
-      - INVITE_TOKEN_TTL=86400        # 24 hours in seconds
-      - RESET_TOKEN_TTL=3600          # 1 hour in seconds
+      - INVITE_TOKEN_TTL=86400
+      - RESET_TOKEN_TTL=3600
     networks:
       - internal
     depends_on:
@@ -112,8 +112,8 @@ services:
   # ── PET & FEED HISTORY SERVICE ─────────────
   pet-service:
     build:
-      context: ./services/pet-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/pet-service/Dockerfile
     container_name: pf_pet_service
     restart: unless-stopped
     environment:
@@ -132,21 +132,18 @@ services:
   # ── DEVICE SERVICE ─────────────────────────
   device-service:
     build:
-      context: ./services/device-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/device-service/Dockerfile
     container_name: pf_device_service
     restart: unless-stopped
     environment:
       - NODE_ENV=production
       - PORT=3003
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      - REDIS_URL=redis://redis:6379
       - MQTT_BROKER_URL=mqtt://mosquitto:1883
       - MQTT_INTERNAL_USER=${MQTT_INTERNAL_USER}
       - MQTT_INTERNAL_PASS=${MQTT_INTERNAL_PASS}
-      - MQTT_CERTS_PATH=/mosquitto/certs
-    volumes:
-      - ./mosquitto/certs:/mosquitto/certs:ro
+      - NOTIFICATION_SERVICE_URL=http://notification-service:3004
     networks:
       - internal
     depends_on:
@@ -158,40 +155,35 @@ services:
   # ── FEED SERVICE ───────────────────────────
   feed-service:
     build:
-      context: ./services/feed-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/feed-service/Dockerfile
     container_name: pf_feed_service
     restart: unless-stopped
     environment:
       - NODE_ENV=production
       - PORT=3005
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      - REDIS_URL=redis://redis:6379
-      - MQTT_BROKER_URL=mqtt://mosquitto:1883
-      - MQTT_INTERNAL_USER=${MQTT_INTERNAL_USER}
-      - MQTT_INTERNAL_PASS=${MQTT_INTERNAL_PASS}
+      - DEVICE_SERVICE_URL=http://device-service:3003
+      - GOOGLE_HOME_HMAC_SECRET=${GOOGLE_HOME_HMAC_SECRET}
     networks:
       - internal
     depends_on:
       postgres:
         condition: service_healthy
-      mosquitto:
+      device-service:
         condition: service_started
-      redis:
-        condition: service_healthy
 
   # ── NOTIFICATION SERVICE ───────────────────
   notification-service:
     build:
-      context: ./services/notification-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/notification-service/Dockerfile
     container_name: pf_notification_service
     restart: unless-stopped
     environment:
       - NODE_ENV=production
       - PORT=3004
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      - REDIS_URL=redis://redis:6379
       - FCM_PROJECT_ID=${FCM_PROJECT_ID}
       - FCM_PRIVATE_KEY=${FCM_PRIVATE_KEY}
       - FCM_CLIENT_EMAIL=${FCM_CLIENT_EMAIL}
@@ -200,22 +192,19 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
 
   # ── SCHEDULE WORKER ────────────────────────
   worker:
     build:
-      context: ./worker
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: worker/Dockerfile
     container_name: pf_worker
     restart: unless-stopped
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - FEED_SERVICE_URL=http://feed-service:3005
-      - NOTIFICATION_SERVICE_URL=http://notification-service:3004
     networks:
       - internal
     depends_on:
@@ -232,7 +221,7 @@ services:
     container_name: pf_mosquitto
     restart: unless-stopped
     ports:
-      - "8883:8883"    # TLS — devices connect here from LAN
+      - "8883:8883"
     volumes:
       - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - ./mosquitto/certs:/mosquitto/certs:ro

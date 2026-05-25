@@ -1,11 +1,6 @@
-// ─────────────────────────────────────────────
-//  Auth middleware
-//  Verifies JWT and attaches user payload to req
-// ─────────────────────────────────────────────
-
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import type { JwtPayload } from '../../../shared/types';
+import type { JwtPayload } from '@servl/shared';
 
 declare global {
   namespace Express {
