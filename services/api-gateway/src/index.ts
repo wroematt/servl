@@ -1,5 +1,6 @@
 import 'express-async-errors';
 import express from 'express';
+import cors from 'cors';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
@@ -9,6 +10,28 @@ import { errorHandler } from './middleware/error';
 const app = express();
 
 app.use(helmet());
+
+// ── CORS ──────────────────────────────────────
+// Allow the website origin (and any additional origins from CORS_ORIGIN env var).
+// In production, set CORS_ORIGIN to the actual domain (e.g. https://app.servl.io).
+const allowedOrigins = new Set([
+  'http://localhost:3006',
+  ...(process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : []),
+]);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, curl, server-to-server)
+      if (!origin || allowedOrigins.has(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS: origin ${origin} not allowed`));
+      }
+    },
+    credentials: true,
+  }),
+);
 
 // NOTE: Do NOT add express.json() here. The gateway only forwards requests —
 // parsing the body would consume the readable stream before http-proxy-middleware
@@ -47,9 +70,12 @@ function rewritePath(prefix: string) {
 
 // ── Headers helper ────────────────────────────
 function setUserHeaders(proxyReq: any, req: any) {
-  proxyReq.setHeader('x-user-id',       req.user.sub);
-  proxyReq.setHeader('x-household-id',  req.user.household_id);
-  proxyReq.setHeader('x-user-role',     req.user.role);
+  proxyReq.setHeader('x-user-id',   req.user.sub);
+  proxyReq.setHeader('x-user-role', req.user.role);
+  // household_id is null for users who haven't joined a household yet
+  if (req.user.household_id) {
+    proxyReq.setHeader('x-household-id', req.user.household_id);
+  }
 }
 
 // ── Public routes (no auth) ───────────────────
@@ -59,13 +85,6 @@ app.use('/auth', authLimiter, createProxyMiddleware({
   target: USER_SERVICE_URL,
   changeOrigin: true,
   pathRewrite: rewritePath('/auth'),
-}));
-
-// Household join — no JWT needed (invite flow)
-app.use('/users/household/join', createProxyMiddleware({
-  target: USER_SERVICE_URL,
-  changeOrigin: true,
-  pathRewrite: rewritePath('/users/household/join'),
 }));
 
 // Google Home webhook — authenticated via HMAC, not JWT

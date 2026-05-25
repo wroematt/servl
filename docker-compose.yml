@@ -19,19 +19,21 @@ volumes:
 
 services:
 
-  # ── REVERSE PROXY ──────────────────────────
-  # nginx and website are commented out during backend development.
-  # Uncomment when the Next.js app is ready.
-  #
-  # nginx:
-  #   image: nginx:1.25-alpine
-  #   ...
-  #
-  # website:
-  #   build:
-  #     context: ./website
-  #     dockerfile: Dockerfile
-  #   ...
+  # ── WEBSITE (Next.js dashboard) ────────────
+  website:
+    build:
+      context: .
+      dockerfile: website/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:3000
+    container_name: pf_website
+    restart: unless-stopped
+    ports:
+      - "3006:3006"
+    networks:
+      - internal
+    depends_on:
+      - api-gateway
 
   # ── API GATEWAY ────────────────────────────
   api-gateway:

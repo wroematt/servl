@@ -28,7 +28,7 @@ export interface Household {
 
 export interface User {
   id: string;
-  household_id: string;
+  household_id: string | null;  // null until user creates or joins a household
   email: string;
   password_hash: string;
   name: string;
@@ -130,7 +130,7 @@ export interface MqttStatusPayload {
 
 export interface JwtPayload {
   sub: string;              // user.id
-  household_id: string;
+  household_id: string | null;
   role: Role;
   iat: number;
   exp: number;

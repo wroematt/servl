@@ -2,26 +2,27 @@ import 'express-async-errors';
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { db } from '../lib/db';
 import { redis } from '../lib/redis';
 import { sendPasswordReset } from '../lib/email';
 import { config } from '../config';
+import { hashToken, issueAccessToken, issueRefreshToken } from '../lib/tokens';
 
 export const authRouter = Router();
 
 // ── Schemas ────────────────────────────────────
 
 const registerSchema = z.object({
-  householdName: z.string().min(1).max(100),
-  name: z.string().min(1).max(100),
-  email: z.string().email(),
-  password: z.string().min(8),
+  name:        z.string().min(1).max(100),
+  email:       z.string().email(),
+  password:    z.string().min(8),
+  // Optional: if provided, user joins this household instead of creating a new one
+  inviteToken: z.string().optional(),
 });
 
 const loginSchema = z.object({
-  email: z.string().email(),
+  email:    z.string().email(),
   password: z.string(),
 });
 
@@ -34,56 +35,21 @@ const forgotSchema = z.object({
 });
 
 const resetSchema = z.object({
-  token: z.string(),
+  token:    z.string(),
   password: z.string().min(8),
 });
 
-// ── Helpers ────────────────────────────────────
-
-function hashToken(token: string): string {
-  return crypto.createHash('sha256').update(token).digest('hex');
-}
-
-function issueAccessToken(userId: string, householdId: string, role: string): string {
-  return jwt.sign(
-    { sub: userId, household_id: householdId, role },
-    config.JWT_SECRET,
-    { expiresIn: config.JWT_EXPIRES_IN as any },
-  );
-}
-
-async function issueRefreshToken(userId: string): Promise<string> {
-  const token = crypto.randomBytes(32).toString('hex');
-  const hash = hashToken(token);
-  const expiresAt = new Date(Date.now() + parseDurationMs(config.REFRESH_TOKEN_EXPIRES_IN));
-  await db.query(
-    'INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)',
-    [userId, hash, expiresAt],
-  );
-  return token;
-}
-
-function parseDurationMs(dur: string): number {
-  const match = dur.match(/^(\d+)([smhd])$/);
-  if (!match) return 30 * 24 * 60 * 60 * 1000;
-  const num = parseInt(match[1], 10);
-  switch (match[2]) {
-    case 's': return num * 1000;
-    case 'm': return num * 60 * 1000;
-    case 'h': return num * 3600 * 1000;
-    case 'd': return num * 86400 * 1000;
-    default:  return 30 * 24 * 60 * 60 * 1000;
-  }
-}
-
 // ── POST /auth/register ────────────────────────
+// Creates a user and either:
+//   - auto-creates a household (no invite token) → user is owner
+//   - joins an existing household (invite token provided) → user is member
 
 authRouter.post('/register', async (req: Request, res: Response) => {
   const body = registerSchema.safeParse(req.body);
   if (!body.success) {
     return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'Invalid request', details: body.error.flatten() });
   }
-  const { householdName, name, email, password } = body.data;
+  const { name, email, password, inviteToken } = body.data;
 
   const existing = await db.query('SELECT id FROM users WHERE email = $1', [email]);
   if (existing.rows.length > 0) {
@@ -92,33 +58,35 @@ authRouter.post('/register', async (req: Request, res: Response) => {
 
   const passwordHash = await bcrypt.hash(password, 12);
 
-  const client = await db.connect();
-  let userId: string;
+  // Resolve household
   let householdId: string;
-  let role: string;
-  try {
-    await client.query('BEGIN');
-    const hhResult = await client.query(
-      'INSERT INTO households (name) VALUES ($1) RETURNING id',
-      [householdName],
-    );
+  let role: 'owner' | 'member';
+
+  if (inviteToken) {
+    // Join an existing household
+    const hash = hashToken(inviteToken);
+    const invitedHouseholdId = await redis.get(`invite:${hash}`);
+    if (!invitedHouseholdId) {
+      return res.status(400).json({ code: 'INVALID_TOKEN', message: 'Invalid or expired invite link' });
+    }
+    householdId = invitedHouseholdId;
+    role = 'member';
+    await redis.del(`invite:${hash}`);
+  } else {
+    // Auto-create a new household
+    const hhResult = await db.query('INSERT INTO households DEFAULT VALUES RETURNING id');
     householdId = hhResult.rows[0].id;
-    const userResult = await client.query(
-      `INSERT INTO users (household_id, email, password_hash, name, role)
-       VALUES ($1, $2, $3, $4, 'owner') RETURNING id, role`,
-      [householdId, email, passwordHash, name],
-    );
-    await client.query('COMMIT');
-    userId = userResult.rows[0].id;
-    role = userResult.rows[0].role;
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
+    role = 'owner';
   }
 
-  const accessToken = issueAccessToken(userId, householdId, role);
+  const userResult = await db.query(
+    `INSERT INTO users (household_id, email, password_hash, name, role)
+     VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+    [householdId, email, passwordHash, name, role],
+  );
+  const userId: string = userResult.rows[0].id;
+
+  const accessToken  = issueAccessToken(userId, householdId, role);
   const refreshToken = await issueRefreshToken(userId);
   return res.status(201).json({ accessToken, refreshToken });
 });
@@ -141,7 +109,7 @@ authRouter.post('/login', async (req: Request, res: Response) => {
     return res.status(401).json({ code: 'UNAUTHORIZED', message: 'Invalid credentials' });
   }
 
-  const accessToken = issueAccessToken(user.id, user.household_id, user.role);
+  const accessToken  = issueAccessToken(user.id, user.household_id, user.role);
   const refreshToken = await issueRefreshToken(user.id);
   return res.json({ accessToken, refreshToken });
 });
@@ -197,7 +165,7 @@ authRouter.post('/forgot-password', async (req: Request, res: Response) => {
   if (result.rows.length > 0) {
     const user = result.rows[0];
     const token = crypto.randomBytes(32).toString('hex');
-    const hash = hashToken(token);
+    const hash  = hashToken(token);
     await redis.setex(`reset:${hash}`, config.RESET_TOKEN_TTL, user.id);
     const resetUrl = `https://${config.DOMAIN}/reset-password?token=${token}`;
     await sendPasswordReset(user.email, resetUrl);
@@ -212,7 +180,7 @@ authRouter.post('/reset-password', async (req: Request, res: Response) => {
   if (!body.success) {
     return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'Invalid request', details: body.error.flatten() });
   }
-  const hash = hashToken(body.data.token);
+  const hash   = hashToken(body.data.token);
   const userId = await redis.get(`reset:${hash}`);
   if (!userId) {
     return res.status(400).json({ code: 'INVALID_TOKEN', message: 'Invalid or expired reset token' });
