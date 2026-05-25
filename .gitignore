@@ -1,0 +1,38 @@
+# Node / TypeScript
+node_modules/
+dist/
+*.js.map
+*.tsbuildinfo
+
+# Environment secrets
+.env
+.env.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Next.js
+.next/
+out/
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/*.keystore
+android/*.jks
+
+# Docker runtime
+mosquitto/certs/
+mosquitto/config/passwd
+postgres/data/
+media/
+
+# Editor / tooling
+.vscode/settings.json
+.claude/
+*.swp
+.DS_Store
+Thumbs.db
