@@ -33,6 +33,17 @@ export function formatWeight(grams: number): string {
   return `${grams}g`;
 }
 
+/**
+ * Prepend the API base URL to a relative upload path (e.g. /uploads/abc.jpg).
+ * Absolute URLs (already starting with http) are returned as-is.
+ */
+export function resolvePhotoUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (url.startsWith('http')) return url;
+  const base = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
+  return `${base}${url}`;
+}
+
 export function formatRelative(iso: string): string {
   const now = Date.now();
   const then = new Date(iso).getTime();

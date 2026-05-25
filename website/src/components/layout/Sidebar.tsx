@@ -43,9 +43,8 @@ export function Sidebar() {
   return (
     <aside className="flex h-screen w-48 flex-col border-r border-border bg-surface">
       {/* Logo */}
-      <div className="flex items-center gap-2 border-b border-border px-4 py-4">
-        <Image src="/logo.png" alt="Servl" width={28} height={28} className="rounded" />
-        <span className="text-sm font-semibold text-text">Servl</span>
+      <div className="flex items-center justify-center border-b border-border px-4 py-4">
+        <Image src="/logo.png" alt="Servl" width={48} height={48} className="rounded-lg" />
       </div>
 
       {/* Main nav */}

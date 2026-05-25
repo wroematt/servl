@@ -54,7 +54,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="mb-8 flex flex-col items-center gap-3">
-          <Image src="/logo.png" alt="Servl" width={48} height={48} className="rounded-xl" />
+          <Image src="/logo.png" alt="Servl" width={192} height={192} className="rounded-2xl" />
           <div className="text-center">
             <h1 className="text-lg font-semibold text-text">Welcome back</h1>
             <p className="text-sm text-text-tertiary">Sign in to your account</p>

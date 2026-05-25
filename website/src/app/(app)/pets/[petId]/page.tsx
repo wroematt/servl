@@ -1,13 +1,14 @@
 'use client';
 
 import { IntakeChart } from '@/components/charts/IntakeChart';
+import { EditPetModal } from '@/components/pets/EditPetModal';
 import { FeedButton } from '@/components/pets/FeedButton';
 import { Badge, StatusBadge, TriggerBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card';
 import { useDeletePet, useFeedHistory, usePet, usePetStats } from '@/hooks/usePets';
-import { formatDateTime, formatWeight } from '@/lib/utils';
-import { IconArrowLeft, IconCpu, IconPaw, IconTrash } from '@tabler/icons-react';
+import { formatDateTime, formatWeight, resolvePhotoUrl } from '@/lib/utils';
+import { IconArrowLeft, IconCpu, IconEdit, IconPaw, IconTrash } from '@tabler/icons-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -19,6 +20,7 @@ export default function PetDetailPage({ params }: { params: Promise<{ petId: str
   const { data: pet, isLoading } = usePet(petId);
   const deletePet = useDeletePet(petId);
 
+  const [showEdit, setShowEdit] = useState(false);
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 20;
   const { data: feedData, isLoading: feedLoading } = useFeedHistory(petId, {
@@ -78,7 +80,7 @@ export default function PetDetailPage({ params }: { params: Promise<{ petId: str
         <div className="flex items-start gap-4">
           <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-border bg-bg">
             {pet.photo_url ? (
-              <Image src={pet.photo_url} alt={pet.name} fill className="object-cover" />
+              <Image src={resolvePhotoUrl(pet.photo_url)!} alt={pet.name} fill className="object-cover" />
             ) : (
               <div className="flex h-full w-full items-center justify-center">
                 <IconPaw size={28} className="text-text-tertiary" />
@@ -103,9 +105,18 @@ export default function PetDetailPage({ params }: { params: Promise<{ petId: str
                 <Button
                   variant="ghost"
                   size="sm"
+                  onClick={() => setShowEdit(true)}
+                  title="Edit pet"
+                >
+                  <IconEdit size={14} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={handleDelete}
                   loading={deletePet.isPending}
                   className="text-danger hover:text-danger"
+                  title="Delete pet"
                 >
                   <IconTrash size={14} />
                 </Button>
@@ -136,6 +147,10 @@ export default function PetDetailPage({ params }: { params: Promise<{ petId: str
           ))}
         </div>
       </Card>
+
+      {showEdit && (
+        <EditPetModal pet={pet} open={showEdit} onClose={() => setShowEdit(false)} />
+      )}
 
       {/* Chart */}
       {stats && stats.length > 0 && (

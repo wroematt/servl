@@ -80,6 +80,13 @@ function setUserHeaders(proxyReq: any, req: any) {
 
 // ── Public routes (no auth) ───────────────────
 
+// Pet photo uploads — served by pet-service, no auth required
+app.use('/uploads', createProxyMiddleware({
+  target: PET_SERVICE_URL,
+  changeOrigin: true,
+  pathRewrite: rewritePath('/uploads'),
+}));
+
 // Auth endpoints — stricter rate limit
 app.use('/auth', authLimiter, createProxyMiddleware({
   target: USER_SERVICE_URL,

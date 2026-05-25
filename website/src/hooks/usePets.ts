@@ -8,7 +8,7 @@ export interface Pet {
   type: 'cat' | 'dog' | 'other';
   meal_weight_g: number;
   snack_weight_g: number;
-  target_daily_g: number;
+  daily_target_g: number;
   device_id: string | null;
   device_name?: string | null;
   photo_url: string | null;

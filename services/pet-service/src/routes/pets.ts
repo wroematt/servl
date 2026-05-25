@@ -39,7 +39,7 @@ petsRouter.get('/', async (req: Request, res: Response) => {
 
 const createPetSchema = z.object({
   name: z.string().min(1).max(100),
-  type: z.enum(['cat', 'dog']),
+  type: z.enum(['cat', 'dog', 'other']),
   meal_weight_g: z.coerce.number().int().min(1).max(500).default(80),
   snack_weight_g: z.coerce.number().int().min(1).max(500).default(20),
   daily_target_g: z.coerce.number().int().min(1).max(2000).default(200),
@@ -79,7 +79,7 @@ petsRouter.get('/:petId', async (req: Request, res: Response) => {
 
 const updatePetSchema = z.object({
   name: z.string().min(1).max(100).optional(),
-  type: z.enum(['cat', 'dog']).optional(),
+  type: z.enum(['cat', 'dog', 'other']).optional(),
   meal_weight_g: z.number().int().min(1).max(500).optional(),
   snack_weight_g: z.number().int().min(1).max(500).optional(),
   daily_target_g: z.number().int().min(1).max(2000).optional(),

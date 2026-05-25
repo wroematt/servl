@@ -30,8 +30,8 @@ export function QuickFeedPanel({ pets, loading }: QuickFeedPanelProps) {
       ) : (
         <div className="space-y-2">
           {pets.map((pet) => {
-            const intakePct = pet.target_daily_g > 0
-              ? Math.min(100, Math.round(((pet.today_intake_g ?? 0) / pet.target_daily_g) * 100))
+            const intakePct = pet.daily_target_g > 0
+              ? Math.min(100, Math.round(((pet.today_intake_g ?? 0) / pet.daily_target_g) * 100))
               : 0;
             return (
               <div

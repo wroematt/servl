@@ -80,7 +80,7 @@ function JoinRedirector() {
     <div className="flex min-h-screen items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-3">
-          <Image src="/logo.png" alt="Servl" width={48} height={48} className="rounded-xl" />
+          <Image src="/logo.png" alt="Servl" width={192} height={192} className="rounded-2xl" />
         </div>
         <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm text-center space-y-4">
           <div>

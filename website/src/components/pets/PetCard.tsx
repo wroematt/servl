@@ -3,6 +3,7 @@
 import { Badge } from '@/components/ui/Badge';
 import { FeedButton } from './FeedButton';
 import { Pet } from '@/hooks/usePets';
+import { resolvePhotoUrl } from '@/lib/utils';
 import { IconPaw } from '@tabler/icons-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -18,8 +19,8 @@ const typeLabel: Record<string, string> = {
 };
 
 export function PetCard({ pet }: PetCardProps) {
-  const intakePct = pet.target_daily_g > 0
-    ? Math.min(100, Math.round(((pet.today_intake_g ?? 0) / pet.target_daily_g) * 100))
+  const intakePct = pet.daily_target_g > 0
+    ? Math.min(100, Math.round(((pet.today_intake_g ?? 0) / pet.daily_target_g) * 100))
     : 0;
 
   return (
@@ -29,7 +30,7 @@ export function PetCard({ pet }: PetCardProps) {
         <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full border border-border bg-bg">
           {pet.photo_url ? (
             <Image
-              src={pet.photo_url}
+              src={resolvePhotoUrl(pet.photo_url)!}
               alt={pet.name}
               fill
               className="object-cover"
@@ -55,7 +56,7 @@ export function PetCard({ pet }: PetCardProps) {
       <div>
         <div className="mb-1 flex justify-between text-xs text-text-tertiary">
           <span>Today&apos;s intake</span>
-          <span className="font-mono">{pet.today_intake_g ?? 0}g / {pet.target_daily_g}g</span>
+          <span className="font-mono">{pet.today_intake_g ?? 0}g / {pet.daily_target_g}g</span>
         </div>
         <div className="h-1.5 overflow-hidden rounded-full bg-border">
           <div
