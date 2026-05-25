@@ -1,0 +1,8 @@
+# Never send these to the Docker build context — they are huge and re-installed inside the container.
+node_modules
+website/node_modules
+website/.next
+android/
+.git
+.env
+*.log

@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { api } from '@/lib/api';
+import { VERSION } from '@/lib/version';
 import { useAuth } from '@/providers/AuthProvider';
 import { IconBrandGoogle } from '@tabler/icons-react';
 import Image from 'next/image';
@@ -128,6 +129,7 @@ export default function LoginPage() {
           </p>
         </form>
       </div>
+      <p className="mt-4 text-center text-xs text-text-tertiary">v{VERSION}</p>
     </div>
   );
 }
