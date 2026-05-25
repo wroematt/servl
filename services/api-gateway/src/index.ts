@@ -28,10 +28,10 @@ const apiLimiter = rateLimit({
 // ── Service URLs ──────────────────────────────
 
 const {
-  USER_SERVICE_URL,
-  PET_SERVICE_URL,
-  DEVICE_SERVICE_URL,
-  FEED_SERVICE_URL,
+  USER_SERVICE_URL    = 'http://user-service:3001',
+  PET_SERVICE_URL     = 'http://pet-service:3002',
+  DEVICE_SERVICE_URL  = 'http://device-service:3003',
+  FEED_SERVICE_URL    = 'http://feed-service:3005',
 } = process.env;
 
 // ── Public routes (no auth) ───────────────────

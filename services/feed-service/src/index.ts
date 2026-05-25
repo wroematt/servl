@@ -2,6 +2,7 @@ import 'express-async-errors';
 import express from 'express';
 import { config } from './config';
 import { feedRouter } from './routes/feed';
+import { internalRouter } from './routes/internal';
 import { webhookRouter } from './routes/webhook';
 import { errorHandler } from './middleware/error';
 
@@ -12,6 +13,7 @@ app.use('/webhook/google-home', express.raw({ type: 'application/json' }), webho
 
 app.use(express.json());
 app.use('/feed', feedRouter);
+app.use('/internal', internalRouter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
