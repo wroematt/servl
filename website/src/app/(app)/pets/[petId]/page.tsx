@@ -87,7 +87,7 @@ export default function PetDetailPage({ params }: { params: { petId: string } })
         <div className="flex items-start gap-4">
           <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-border bg-bg">
             {pet.photo_url ? (
-              <Image src={resolvePhotoUrl(pet.photo_url)!} alt={pet.name} fill className="object-cover" />
+              <Image src={resolvePhotoUrl(pet.photo_url)!} alt={pet.name} fill unoptimized className="object-cover" />
             ) : (
               <div className="flex h-full w-full items-center justify-center">
                 <IconPaw size={28} className="text-text-tertiary" />

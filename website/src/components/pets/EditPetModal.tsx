@@ -87,8 +87,8 @@ export function EditPetModal({ pet, open, onClose }: EditPetModalProps) {
                   alt={pet.name}
                   width={64}
                   height={64}
+                  unoptimized
                   className="h-full w-full object-cover"
-                  unoptimized={photoPreview.startsWith('blob:')}
                 />
               ) : (
                 <IconPaw size={24} className="text-text-tertiary" />

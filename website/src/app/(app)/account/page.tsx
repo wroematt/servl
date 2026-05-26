@@ -155,6 +155,7 @@ export default function AccountPage() {
                     alt={user.name}
                     width={64}
                     height={64}
+                    unoptimized
                     className="h-full w-full object-cover"
                   />
                 ) : (

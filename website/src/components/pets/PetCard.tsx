@@ -41,6 +41,7 @@ export function PetCard({ pet }: PetCardProps) {
                 src={resolvePhotoUrl(pet.photo_url)!}
                 alt={pet.name}
                 fill
+                unoptimized
                 className="object-cover"
               />
             ) : (
