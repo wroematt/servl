@@ -9,7 +9,12 @@ import { errorHandler } from './middleware/error';
 
 const app = express();
 
-app.use(helmet());
+app.use(helmet({
+  // The gateway is intentionally cross-origin: the website (port 3006) loads
+  // images and data from the API (port 3000). Helmet's default 'same-origin'
+  // policy would cause the browser to block cross-origin <img> loads silently.
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
 
 // ── CORS ──────────────────────────────────────
 // Allow the website origin (and any additional origins from CORS_ORIGIN env var).
