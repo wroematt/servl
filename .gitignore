@@ -1,38 +1,54 @@
-# Node / TypeScript
+# ── Node / TypeScript ─────────────────────────
 node_modules/
 dist/
+build/
 *.js.map
 *.tsbuildinfo
+*.d.ts.map
 
-# Environment secrets
+# ── Environment secrets ───────────────────────
 .env
 .env.local
+.env.production
+.env.*.local
 
-# Logs
+# ── Logs ──────────────────────────────────────
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+logs/
 
-# Next.js
+# ── Next.js ───────────────────────────────────
 .next/
 out/
 
-# Android
+# ── Android ───────────────────────────────────
 android/.gradle/
 android/build/
 android/app/build/
 android/local.properties
 android/*.keystore
 android/*.jks
+android/.idea/
+android/captures/
+android/app/.cxx/
+*.apk
+*.aab
 
-# Docker runtime
+# ── Docker runtime / generated files ─────────
 mosquitto/certs/
 mosquitto/config/passwd
 postgres/data/
 media/
+user-media/
 
-# Editor / tooling
-.vscode/settings.json
-.claude/
-*.swp
+# ── OS / Editor ───────────────────────────────
 .DS_Store
 Thumbs.db
+*.swp
+*.swo
+.vscode/settings.json
+.idea/
+.claude/
