@@ -5,9 +5,11 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { api } from '@/lib/api';
+import { resolvePhotoUrl } from '@/lib/utils';
 import { useAuth } from '@/providers/AuthProvider';
-import { IconCopy } from '@tabler/icons-react';
-import { FormEvent, useState } from 'react';
+import { IconCamera, IconCopy } from '@tabler/icons-react';
+import Image from 'next/image';
+import { FormEvent, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface Member {
@@ -41,6 +43,30 @@ export default function AccountPage() {
     }
   };
 
+  // Photo upload
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoMsg, setPhotoMsg] = useState('');
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoUploading(true);
+    setPhotoMsg('');
+    try {
+      const form = new FormData();
+      form.append('photo', file);
+      await api.postForm('/users/me/photo', form);
+      await refresh();
+      setPhotoMsg('Photo updated!');
+    } catch (err: unknown) {
+      setPhotoMsg(err instanceof Error ? err.message : 'Failed to upload photo');
+    } finally {
+      setPhotoUploading(false);
+      if (photoInputRef.current) photoInputRef.current.value = '';
+    }
+  };
+
   // Password
   const [currentPw, setCurrentPw] = useState('');
   const [newPw, setNewPw] = useState('');
@@ -53,7 +79,7 @@ export default function AccountPage() {
     setPwSaving(true);
     setPwMsg('');
     try {
-      await api.patch('/users/me', { current_password: currentPw, password: newPw });
+      await api.patch('/users/me', { current_password: currentPw, new_password: newPw });
       setCurrentPw(''); setNewPw('');
       setPwMsg('Password updated!');
     } catch (err: unknown) {
@@ -83,8 +109,8 @@ export default function AccountPage() {
   const generateInvite = async () => {
     setInviteLoading(true);
     try {
-      const data = await api.post<{ url: string }>('/users/household/invite');
-      setInviteLink(data.url);
+      const data = await api.post<{ inviteUrl: string }>('/users/household/invite');
+      setInviteLink(data.inviteUrl);
     } catch { /* ignore */ }
     finally { setInviteLoading(false); }
   };
@@ -102,6 +128,8 @@ export default function AccountPage() {
 
   if (!user) return null;
 
+  const avatarUrl = resolvePhotoUrl(user.photo_url);
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
@@ -117,9 +145,43 @@ export default function AccountPage() {
           <CardTitle>Profile</CardTitle>
         </CardHeader>
         <form onSubmit={handleProfileSave} className="space-y-4">
+          {/* Avatar + photo upload */}
           <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary-light text-xl font-semibold text-primary">
-              {user.name.charAt(0).toUpperCase()}
+            <div className="relative shrink-0">
+              <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-primary-light text-xl font-semibold text-primary">
+                {avatarUrl ? (
+                  <Image
+                    src={avatarUrl}
+                    alt={user.name}
+                    width={64}
+                    height={64}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  user.name.charAt(0).toUpperCase()
+                )}
+              </div>
+              {/* Upload overlay */}
+              <button
+                type="button"
+                onClick={() => photoInputRef.current?.click()}
+                disabled={photoUploading}
+                title="Change photo"
+                className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-surface bg-primary text-white hover:bg-primary-hover transition-colors disabled:opacity-50"
+              >
+                {photoUploading ? (
+                  <span className="h-3 w-3 animate-spin rounded-full border border-white border-t-transparent" />
+                ) : (
+                  <IconCamera size={12} />
+                )}
+              </button>
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={handlePhotoChange}
+              />
             </div>
             <div className="flex-1">
               <Input
@@ -131,9 +193,9 @@ export default function AccountPage() {
             </div>
           </div>
           <Input label="Email" value={user.email} disabled />
-          {profileMsg && (
-            <p className={`text-xs ${profileMsg === 'Saved!' ? 'text-success' : 'text-danger'}`}>
-              {profileMsg}
+          {(profileMsg || photoMsg) && (
+            <p className={`text-xs ${(profileMsg === 'Saved!' || photoMsg === 'Photo updated!') ? 'text-success' : 'text-danger'}`}>
+              {photoMsg || profileMsg}
             </p>
           )}
           <Button type="submit" loading={profileSaving}>

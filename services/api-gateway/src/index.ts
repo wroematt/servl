@@ -87,6 +87,13 @@ app.use('/uploads', createProxyMiddleware({
   pathRewrite: rewritePath('/uploads'),
 }));
 
+// User profile photo uploads — served by user-service, no auth required
+app.use('/user-uploads', createProxyMiddleware({
+  target: USER_SERVICE_URL,
+  changeOrigin: true,
+  pathRewrite: rewritePath('/user-uploads'),
+}));
+
 // Auth endpoints — stricter rate limit
 app.use('/auth', authLimiter, createProxyMiddleware({
   target: USER_SERVICE_URL,

@@ -12,10 +12,10 @@ import { IconArrowLeft, IconCpu, IconEdit, IconPaw, IconTrash } from '@tabler/ic
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { use, useState } from 'react';
+import { useState } from 'react';
 
-export default function PetDetailPage({ params }: { params: Promise<{ petId: string }> }) {
-  const { petId } = use(params);
+export default function PetDetailPage({ params }: { params: { petId: string } }) {
+  const { petId } = params;
   const router = useRouter();
   const { data: pet, isLoading } = usePet(petId);
   const deletePet = useDeletePet(petId);
@@ -28,11 +28,9 @@ export default function PetDetailPage({ params }: { params: Promise<{ petId: str
     page_size: PAGE_SIZE,
   });
 
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .slice(0, 10);
-  const today = new Date().toISOString().slice(0, 10);
-  const { data: stats } = usePetStats(petId, thirtyDaysAgo, today);
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
+  const { data: stats } = usePetStats(petId, thirtyDaysAgo, todayEnd.toISOString());
 
   const handleDelete = async () => {
     if (!confirm(`Delete ${pet?.name}? Feed history will be preserved.`)) return;

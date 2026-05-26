@@ -17,10 +17,11 @@ export default function DashboardPage() {
   const { data: devices, isLoading: devicesLoading } = useDevices();
 
   // Use the first pet's history as today's feed — aggregate all pets
-  const today = new Date().toISOString().slice(0, 10);
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+  const todayEnd   = new Date(); todayEnd.setHours(23, 59, 59, 999);
   const { data: feedData, isLoading: feedLoading } = useFeedHistory(
     pets?.[0]?.id ?? '',
-    { from: today, to: today, page_size: 50 },
+    { from: todayStart.toISOString(), to: todayEnd.toISOString(), page_size: 50 },
   );
 
   const petNames = Object.fromEntries(

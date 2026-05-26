@@ -137,6 +137,10 @@ export const api = {
   post<T>(path: string, body?: unknown, opts?: Omit<RequestOptions, 'method' | 'body'>): Promise<T> {
     return request<T>(path, { method: 'POST', body, ...opts });
   },
+  /** POST with multipart/form-data (file uploads). Pass a FormData instance. */
+  postForm<T>(path: string, form: FormData): Promise<T> {
+    return request<T>(path, { method: 'POST', body: form, multipart: true });
+  },
   patch<T>(path: string, body?: unknown): Promise<T> {
     return request<T>(path, { method: 'PATCH', body });
   },

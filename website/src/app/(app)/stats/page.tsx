@@ -9,6 +9,7 @@ import { useState } from 'react';
 export default function StatsPage() {
   const { data: pets } = usePets();
 
+  // Date picker values (YYYY-MM-DD display format)
   const defaultTo = new Date().toISOString().slice(0, 10);
   const defaultFrom = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
     .toISOString()
@@ -21,7 +22,11 @@ export default function StatsPage() {
   const targetPetId =
     selectedPetId !== '__all__' ? selectedPetId : pets?.[0]?.id ?? '';
 
-  const { data: stats, isLoading } = usePetStats(targetPetId, from, to);
+  // Convert YYYY-MM-DD picker values to full ISO datetimes for the API
+  const fromISO = from ? `${from}T00:00:00.000Z` : undefined;
+  const toISO   = to   ? `${to}T23:59:59.999Z`   : undefined;
+
+  const { data: stats, isLoading } = usePetStats(targetPetId, fromISO, toISO);
 
   const totalG = stats?.reduce((s, d) => s + d.total_g, 0) ?? 0;
   const totalFeeds = stats?.reduce((s, d) => s + d.feed_count, 0) ?? 0;

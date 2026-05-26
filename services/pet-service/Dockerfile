@@ -25,6 +25,8 @@ RUN npm install --omit=dev && npm cache clean --force
 
 COPY --from=builder /app/services/pet-service/dist ./dist
 
+RUN mkdir -p /uploads && chown appuser:appgroup /uploads
+
 USER appuser
 ENV NODE_ENV=production
 EXPOSE 3000

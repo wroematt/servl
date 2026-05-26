@@ -7,6 +7,7 @@ import { db } from '../lib/db';
 import { redis } from '../lib/redis';
 import { config } from '../config';
 import { hashToken, issueAccessToken, issueRefreshToken } from '../lib/tokens';
+import { userPhotoUpload } from '../lib/upload';
 
 export const usersRouter = Router();
 
@@ -92,6 +93,22 @@ usersRouter.patch('/me', async (req: Request, res: Response) => {
   );
   return res.json(updated.rows[0]);
 });
+
+// ── POST /users/me/photo ───────────────────────
+
+usersRouter.post(
+  '/me/photo',
+  userPhotoUpload.single('photo'),
+  async (req: Request, res: Response) => {
+    const { userId } = getHeaders(req);
+    if (!req.file) {
+      return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'No photo file provided' });
+    }
+    const photoUrl = `/user-uploads/${req.file.filename}`;
+    await db.query('UPDATE users SET photo_url = $1 WHERE id = $2', [photoUrl, userId]);
+    return res.json({ photo_url: photoUrl });
+  },
+);
 
 // ── GET /users/household ───────────────────────
 

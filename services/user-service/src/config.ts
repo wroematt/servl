@@ -15,6 +15,7 @@ const schema = z.object({
   EMAIL_FROM: z.string(),
   INVITE_TOKEN_TTL: z.string().default('86400').transform(Number),
   RESET_TOKEN_TTL: z.string().default('3600').transform(Number),
+  USER_MEDIA_UPLOAD_PATH: z.string().default('/user-uploads'),
 });
 
 export const config = schema.parse(process.env);

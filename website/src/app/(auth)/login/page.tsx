@@ -51,7 +51,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-bg px-4">
+    <div className="relative flex min-h-screen flex-col items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="mb-8 flex flex-col items-center gap-3">
@@ -129,7 +129,7 @@ export default function LoginPage() {
           </p>
         </form>
       </div>
-      <p className="mt-4 text-center text-xs text-text-tertiary">v{VERSION}</p>
+      <p className="absolute bottom-4 text-center text-xs text-text-tertiary">v{VERSION}</p>
     </div>
   );
 }

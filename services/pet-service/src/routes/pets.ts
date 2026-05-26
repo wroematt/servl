@@ -138,8 +138,8 @@ petsRouter.delete('/:petId', async (req: Request, res: Response) => {
 const feedsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   page_size: z.coerce.number().int().min(1).max(100).default(20),
-  from: z.string().datetime().optional(),
-  to: z.string().datetime().optional(),
+  from: z.string().refine(v => !isNaN(Date.parse(v)), 'Invalid date').optional(),
+  to: z.string().refine(v => !isNaN(Date.parse(v)), 'Invalid date').optional(),
   trigger_type: z.enum(['manual', 'schedule', 'voice', 'api']).optional(),
 });
 
@@ -182,8 +182,8 @@ petsRouter.get('/:petId/feeds', async (req: Request, res: Response) => {
 // ── GET /pets/:petId/stats ─────────────────────
 
 const statsQuerySchema = z.object({
-  from: z.string().datetime(),
-  to: z.string().datetime(),
+  from: z.string().refine(v => !isNaN(Date.parse(v)), 'Invalid date for from'),
+  to: z.string().refine(v => !isNaN(Date.parse(v)), 'Invalid date for to'),
 });
 
 petsRouter.get('/:petId/stats', async (req: Request, res: Response) => {
