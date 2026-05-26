@@ -77,17 +77,19 @@ petsRouter.get('/:petId', async (req: Request, res: Response) => {
 
 // ── PATCH /pets/:petId ─────────────────────────
 
+// z.coerce.number() handles both JSON numbers and FormData strings
 const updatePetSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   type: z.enum(['cat', 'dog', 'other']).optional(),
-  meal_weight_g: z.number().int().min(1).max(500).optional(),
-  snack_weight_g: z.number().int().min(1).max(500).optional(),
-  daily_target_g: z.number().int().min(1).max(2000).optional(),
+  meal_weight_g:  z.coerce.number().int().min(1).max(500).optional(),
+  snack_weight_g: z.coerce.number().int().min(1).max(500).optional(),
+  daily_target_g: z.coerce.number().int().min(1).max(2000).optional(),
   device_id: z.string().uuid().nullable().optional(),
-  photo_url: z.string().nullable().optional(),
 });
 
-petsRouter.patch('/:petId', async (req: Request, res: Response) => {
+// upload.single('photo') is a no-op for JSON requests; it only activates for
+// multipart/form-data submissions that include a file field named "photo".
+petsRouter.patch('/:petId', upload.single('photo'), async (req: Request, res: Response) => {
   const { householdId } = getHeaders(req);
   const body = updatePetSchema.safeParse(req.body);
   if (!body.success) {
@@ -99,7 +101,11 @@ petsRouter.patch('/:petId', async (req: Request, res: Response) => {
   );
   if (!pet.rows[0]) return res.status(404).json({ code: 'NOT_FOUND', message: 'Pet not found' });
 
-  const fields = body.data as Record<string, unknown>;
+  const fields: Record<string, unknown> = { ...body.data };
+  // If a new photo was uploaded, override photo_url
+  if (req.file) {
+    fields.photo_url = `/uploads/${path.basename(req.file.path)}`;
+  }
   const setClauses: string[] = [];
   const values: unknown[] = [];
   let idx = 1;

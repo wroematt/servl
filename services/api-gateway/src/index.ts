@@ -47,7 +47,7 @@ const authLimiter = rateLimit({
 
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 120,
+  max: 300,   // 5 req/s average — a full dashboard load is ~8 requests
   message: { code: 'RATE_LIMITED', message: 'Too many requests' },
 });
 

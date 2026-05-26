@@ -12,7 +12,7 @@ import { IconArrowLeft, IconCpu, IconEdit, IconPaw, IconTrash } from '@tabler/ic
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 export default function PetDetailPage({ params }: { params: { petId: string } }) {
   const { petId } = params;
@@ -28,9 +28,18 @@ export default function PetDetailPage({ params }: { params: { petId: string } })
     page_size: PAGE_SIZE,
   });
 
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
-  const { data: stats } = usePetStats(petId, thirtyDaysAgo, todayEnd.toISOString());
+  // Stable dates — computed once per mount, not on every render.
+  // Without useMemo, Date.now() produces a new millisecond value every render
+  // which changes the React Query key and fires an infinite stream of requests.
+  const { statsFrom, statsTo } = useMemo(() => {
+    const from = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    from.setHours(0, 0, 0, 0);
+    const to = new Date();
+    to.setHours(23, 59, 59, 999);
+    return { statsFrom: from.toISOString(), statsTo: to.toISOString() };
+  }, []);
+
+  const { data: stats } = usePetStats(petId, statsFrom, statsTo);
 
   const handleDelete = async () => {
     if (!confirm(`Delete ${pet?.name}? Feed history will be preserved.`)) return;

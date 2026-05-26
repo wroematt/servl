@@ -44,7 +44,12 @@ export function useCreatePet() {
 export function useUpdatePet(petId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: Partial<Pet>) => api.patch<Pet>(`/pets/${petId}`, body),
+    mutationFn: (data: FormData | Partial<Pet>) => {
+      if (data instanceof FormData) {
+        return api.patchForm<Pet>(`/pets/${petId}`, data);
+      }
+      return api.patch<Pet>(`/pets/${petId}`, data);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['pets'] });
       qc.invalidateQueries({ queryKey: ['pets', petId] });

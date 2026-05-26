@@ -144,6 +144,10 @@ export const api = {
   patch<T>(path: string, body?: unknown): Promise<T> {
     return request<T>(path, { method: 'PATCH', body });
   },
+  /** PATCH with multipart/form-data (file + text fields). Pass a FormData instance. */
+  patchForm<T>(path: string, form: FormData): Promise<T> {
+    return request<T>(path, { method: 'PATCH', body: form, multipart: true });
+  },
   delete<T>(path: string): Promise<T> {
     return request<T>(path, { method: 'DELETE' });
   },

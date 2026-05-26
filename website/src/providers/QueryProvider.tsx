@@ -9,8 +9,9 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 30_000,
-            retry: 1,
+            staleTime: 30_000,      // data is fresh for 30 s — no re-fetch during that window
+            retry: 1,               // only retry once on failure (avoids hammering on 429)
+            refetchOnWindowFocus: false, // don't re-fetch every time the user alt-tabs back
           },
         },
       }),
