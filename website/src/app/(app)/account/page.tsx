@@ -9,7 +9,7 @@ import { resolvePhotoUrl } from '@/lib/utils';
 import { useAuth } from '@/providers/AuthProvider';
 import { IconCamera, IconCopy } from '@tabler/icons-react';
 import Image from 'next/image';
-import { FormEvent, useRef, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface Member {
@@ -92,13 +92,41 @@ export default function AccountPage() {
   // Household members
   const [members, setMembers] = useState<Member[]>([]);
   const [membersLoaded, setMembersLoaded] = useState(false);
+  const [memberMsg, setMemberMsg] = useState('');
+
   const loadMembers = async () => {
-    if (membersLoaded) return;
     try {
       const data = await api.get<Member[]>('/users/household');
       setMembers(data);
       setMembersLoaded(true);
     } catch { /* ignore */ }
+  };
+
+  // Auto-load members on mount so owners can manage them immediately
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { loadMembers(); }, []);
+
+  const handleRoleChange = async (memberId: string, newRole: 'owner' | 'member') => {
+    setMemberMsg('');
+    try {
+      await api.patch(`/users/${memberId}/role`, { role: newRole });
+      await loadMembers();
+      setMemberMsg(newRole === 'owner' ? 'Promoted to owner.' : 'Changed to member.');
+    } catch (err: unknown) {
+      setMemberMsg(err instanceof Error ? err.message : 'Failed to update role');
+    }
+  };
+
+  const handleRemoveMember = async (memberId: string, memberName: string) => {
+    if (!confirm(`Remove ${memberName} from the household?`)) return;
+    setMemberMsg('');
+    try {
+      await api.delete(`/users/${memberId}`);
+      await loadMembers();
+      setMemberMsg('Member removed.');
+    } catch (err: unknown) {
+      setMemberMsg(err instanceof Error ? err.message : 'Failed to remove member');
+    }
   };
 
   // Invite
@@ -260,30 +288,64 @@ export default function AccountPage() {
           </div>
         )}
 
-        <div className="space-y-2" onClick={loadMembers}>
-          {membersLoaded ? (
-            members.map((m) => (
+        {memberMsg && (
+          <p className={`mb-3 text-xs ${memberMsg.endsWith('.') ? 'text-success' : 'text-danger'}`}>
+            {memberMsg}
+          </p>
+        )}
+
+        <div className="space-y-2">
+          {!membersLoaded ? (
+            <p className="text-xs text-text-tertiary">Loading members…</p>
+          ) : members.map((m) => {
+            const isSelf = m.id === user.id;
+            const canManage = user.role === 'owner' && !isSelf;
+            return (
               <div key={m.id} className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-bg">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-bg border border-border text-xs font-medium text-text-secondary">
                   {m.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-text">{m.name}</p>
+                  <p className="text-sm font-medium text-text">
+                    {m.name}
+                    {isSelf && <span className="ml-1.5 text-xs text-text-tertiary">(you)</span>}
+                  </p>
                   <p className="text-xs text-text-tertiary">{m.email}</p>
                 </div>
                 <Badge variant={m.role === 'owner' ? 'default' : 'muted'}>
                   {m.role}
                 </Badge>
+                {canManage && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    {m.role === 'member' ? (
+                      <button
+                        onClick={() => handleRoleChange(m.id, 'owner')}
+                        title="Promote to owner"
+                        className="rounded px-2 py-1 text-xs text-primary hover:bg-primary-light transition-colors"
+                      >
+                        Make owner
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleRoleChange(m.id, 'member')}
+                        title="Demote to member"
+                        className="rounded px-2 py-1 text-xs text-text-secondary hover:bg-bg transition-colors"
+                      >
+                        Make member
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleRemoveMember(m.id, m.name)}
+                      title="Remove from household"
+                      className="rounded px-2 py-1 text-xs text-danger hover:bg-danger-light transition-colors"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
               </div>
-            ))
-          ) : (
-            <button
-              type="button"
-              className="text-xs text-primary hover:underline"
-            >
-              Load members
-            </button>
-          )}
+            );
+          })}
         </div>
       </Card>
 
