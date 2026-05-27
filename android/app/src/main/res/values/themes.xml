@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Splash screen theme — windowBackground matches the app bg colour -->
+    <style name="Theme.Servl" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#F5F4F0</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/Theme.Servl.Main</item>
+    </style>
+
+    <style name="Theme.Servl.Main" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">#F5F4F0</item>
+    </style>
+</resources>
