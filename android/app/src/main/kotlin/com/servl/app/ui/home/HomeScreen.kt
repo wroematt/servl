@@ -1,6 +1,5 @@
 package com.servl.app.ui.home
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -11,10 +10,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.servl.app.R
+import coil3.compose.AsyncImage
 import com.servl.app.ui.auth.AuthState
 import com.servl.app.ui.auth.AuthViewModel
 import com.servl.app.ui.components.HopperIndicator
@@ -58,8 +56,8 @@ fun HomeScreen(
                         .statusBarsPadding()
                         .padding(horizontal = 16.dp, vertical = 10.dp),
                 ) {
-                    Image(
-                        painter = painterResource(R.drawable.logo),
+                    AsyncImage(
+                        model = "file:///android_asset/servl-logo-banner.svg",
                         contentDescription = "Servl",
                         contentScale = ContentScale.Fit,
                         modifier = Modifier

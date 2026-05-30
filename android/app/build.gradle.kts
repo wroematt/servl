@@ -85,6 +85,7 @@ dependencies {
     // Image loading
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+    implementation(libs.coil.svg)
 
     // Charts
     implementation(libs.vico.compose)

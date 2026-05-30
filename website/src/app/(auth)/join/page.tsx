@@ -2,7 +2,7 @@
 
 import { api } from '@/lib/api';
 import { useAuth } from '@/providers/AuthProvider';
-import Image from 'next/image';
+
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
@@ -80,7 +80,7 @@ function JoinRedirector() {
     <div className="flex min-h-screen items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-3">
-          <Image src="/logo.png" alt="Servl" width={192} height={192} className="rounded-2xl" />
+          <img src="/servl-logo.svg" alt="Servl" width={192} />
         </div>
         <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm text-center space-y-4">
           <div>

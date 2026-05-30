@@ -3,7 +3,7 @@
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { api } from '@/lib/api';
-import Image from 'next/image';
+
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FormEvent, Suspense, useState } from 'react';
@@ -90,7 +90,7 @@ export default function ResetPasswordPage() {
     <div className="flex min-h-screen items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-3">
-          <Image src="/logo.png" alt="Servl" width={192} height={192} className="rounded-2xl" />
+          <img src="/servl-logo.svg" alt="Servl" width={192} />
         </div>
         <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
           <Suspense fallback={<div className="h-32 animate-pulse rounded-lg bg-bg" />}>

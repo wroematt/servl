@@ -11,7 +11,7 @@ import {
   IconPaw,
   IconSettings,
 } from '@tabler/icons-react';
-import Image from 'next/image';
+
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 
@@ -44,7 +44,7 @@ export function Sidebar() {
     <aside className="flex h-screen w-56 flex-col border-r border-border bg-surface">
       {/* Logo */}
       <div className="flex items-center justify-center border-b border-border px-4 py-4">
-        <Image src="/logo.png" alt="Servl" width={192} height={192} className="rounded-xl" />
+        <img src="/servl-logo-banner.svg" alt="Servl" className="w-full max-w-[160px]" />
       </div>
 
       {/* Main nav */}

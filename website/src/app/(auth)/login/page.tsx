@@ -6,7 +6,7 @@ import { api } from '@/lib/api';
 import { VERSION } from '@/lib/version';
 import { useAuth } from '@/providers/AuthProvider';
 import { IconBrandGoogle } from '@tabler/icons-react';
-import Image from 'next/image';
+
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useState } from 'react';
@@ -55,7 +55,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="mb-8 flex flex-col items-center gap-3">
-          <Image src="/logo.png" alt="Servl" width={192} height={192} className="rounded-2xl" />
+          <img src="/servl-logo.svg" alt="Servl" width={192} />
           <div className="text-center">
             <h1 className="text-lg font-semibold text-text">Welcome back</h1>
             <p className="text-sm text-text-tertiary">Sign in to your account</p>
