@@ -1,19 +1,19 @@
 [versions]
-kotlin           = "2.0.21"
+kotlin           = "2.2.10"
 agp              = "8.7.0"
-ksp              = "2.0.21-1.0.28"
-compose-bom      = "2024.12.01"
-hilt             = "2.52"
+ksp              = "2.3.2"
+compose-bom      = "2025.06.00"
+hilt             = "2.56"
 retrofit         = "2.11.0"
 okhttp           = "4.12.0"
-coil             = "3.0.4"
-vico             = "2.0.0-beta.2"
-navigation       = "2.8.4"
-datastore        = "1.1.1"
-firebase-bom     = "33.7.0"
-coroutines       = "1.9.0"
-lifecycle        = "2.8.7"
-activity-compose = "1.9.3"
+coil             = "3.1.0"
+vico             = "2.1.0"
+navigation       = "2.9.0"
+datastore        = "1.1.4"
+firebase-bom     = "34.0.0"
+coroutines       = "1.10.1"
+lifecycle        = "2.9.0"
+activity-compose = "1.10.1"
 splashscreen     = "1.0.1"
 gson             = "2.11.0"
 
@@ -58,7 +58,7 @@ lifecycle-runtime-compose      = { group = "androidx.lifecycle", name = "lifecyc
 
 # Firebase
 firebase-bom                   = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebase-bom" }
-firebase-messaging             = { group = "com.google.firebase", name = "firebase-messaging-ktx" }
+firebase-messaging             = { group = "com.google.firebase", name = "firebase-messaging" }
 
 # Coroutines
 kotlinx-coroutines-android     = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }

@@ -1,5 +1,10 @@
+// Move build output outside Documents so Windows Search Indexer cannot lock intermediate files
+layout.buildDirectory.set(file("C:/ServlBuild/app"))
+
 plugins {
     alias(libs.plugins.android.application)
+    // kotlin-android is applied separately because android.builtInKotlin=false
+    // keeps Android BaseExtension available (required by the Hilt Gradle plugin)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt)
@@ -18,8 +23,9 @@ android {
         versionCode = 1
         versionName = "1.0.0"
 
-        // Debug: 10.0.2.2 is the Android emulator's alias for localhost on the host machine
-        buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:3000\"")
+        // Debug: replace with your PC's local IP when testing on a physical device
+        // e.g. "http://192.168.50.41:3000"  (run `ipconfig` on your PC to find it)
+        buildConfigField("String", "BASE_URL", "\"http://192.168.50.41:3000\"")
     }
 
     buildTypes {

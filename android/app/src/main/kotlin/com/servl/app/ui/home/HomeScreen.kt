@@ -1,5 +1,6 @@
 package com.servl.app.ui.home
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -9,12 +10,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.servl.app.R
 import com.servl.app.ui.auth.AuthState
 import com.servl.app.ui.auth.AuthViewModel
 import com.servl.app.ui.components.HopperIndicator
 import com.servl.app.ui.components.StatusChip
+import com.servl.app.ui.components.feedTypeIcon
 import com.servl.app.ui.theme.TextSecondary
 import java.time.Instant
 import java.time.ZoneId
@@ -41,19 +46,34 @@ fun HomeScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        val firstName = user?.name?.split(" ")?.firstOrNull() ?: ""
-                        Text("Hello, $firstName", style = MaterialTheme.typography.titleLarge)
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onNavigateToSettings) {
+            // Custom header: white Surface so status-bar icons (battery, signal) are
+            // always visible as dark marks against a light background.
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 2.dp,
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                ) {
+                    Image(
+                        painter = painterResource(R.drawable.logo),
+                        contentDescription = "Servl",
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .fillMaxWidth(0.5f)
+                            .align(Alignment.Center),
+                    )
+                    IconButton(
+                        onClick = onNavigateToSettings,
+                        modifier = Modifier.align(Alignment.CenterEnd),
+                    ) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
-                },
-            )
+                }
+            }
         },
     ) { innerPadding ->
         if (isLoading) {
@@ -68,6 +88,12 @@ fun HomeScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+
+            // ── Greeting ──────────────────────────────────────────────────────
+            item {
+                val firstName = user?.name?.split(" ")?.firstOrNull() ?: ""
+                Text("Hello, $firstName", style = MaterialTheme.typography.titleLarge)
+            }
 
             // ── Quick Feed panel ──────────────────────────────────────────────
             item {
@@ -85,24 +111,38 @@ fun HomeScreen(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text(pet.name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                                Text(
-                                    "${pet.today_intake_g}g / ${pet.daily_target_g}g",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = TextSecondary,
-                                    modifier = Modifier.padding(end = 8.dp),
-                                )
-                                OutlinedButton(
+                                // Pet name + today's progress stacked on the left
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(pet.name, style = MaterialTheme.typography.bodyMedium)
+                                    Text(
+                                        "${pet.today_intake_g}g / ${pet.daily_target_g}g",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = TextSecondary,
+                                    )
+                                }
+                                // Filled meal button
+                                Button(
                                     onClick = { viewModel.feedMeal(pet.id) },
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                                    modifier = Modifier.height(32.dp),
-                                ) { Text("Meal", style = MaterialTheme.typography.labelSmall) }
-                                Spacer(Modifier.width(4.dp))
+                                    enabled = pet.device_id != null,
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                    modifier = Modifier.height(36.dp),
+                                ) {
+                                    Icon(feedTypeIcon("meal"), contentDescription = "Meal", modifier = Modifier.size(14.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("${pet.meal_weight_g}g", style = MaterialTheme.typography.labelSmall)
+                                }
+                                Spacer(Modifier.width(6.dp))
+                                // Outlined snack button
                                 OutlinedButton(
                                     onClick = { viewModel.feedSnack(pet.id) },
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                                    modifier = Modifier.height(32.dp),
-                                ) { Text("Snack", style = MaterialTheme.typography.labelSmall) }
+                                    enabled = pet.device_id != null,
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                    modifier = Modifier.height(36.dp),
+                                ) {
+                                    Icon(feedTypeIcon("snack"), contentDescription = "Snack", modifier = Modifier.size(14.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("${pet.snack_weight_g}g", style = MaterialTheme.typography.labelSmall)
+                                }
                             }
                         }
 

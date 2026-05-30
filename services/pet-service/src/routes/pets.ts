@@ -124,6 +124,23 @@ petsRouter.patch('/:petId', upload.single('photo'), async (req: Request, res: Re
     `UPDATE pets SET ${setClauses.join(', ')} WHERE id = $${idx} RETURNING *`,
     values,
   );
+
+  // Cascade weight changes to meal / snack schedules for this pet so that
+  // schedules always reflect the pet's current portion sizes.
+  const { meal_weight_g, snack_weight_g } = body.data;
+  if (meal_weight_g !== undefined) {
+    await db.query(
+      `UPDATE schedules SET weight_g = $1 WHERE pet_id = $2 AND feed_type = 'meal'`,
+      [meal_weight_g, req.params.petId],
+    );
+  }
+  if (snack_weight_g !== undefined) {
+    await db.query(
+      `UPDATE schedules SET weight_g = $1 WHERE pet_id = $2 AND feed_type = 'snack'`,
+      [snack_weight_g, req.params.petId],
+    );
+  }
+
   return res.json(result.rows[0]);
 });
 

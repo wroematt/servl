@@ -13,6 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.servl.app.ui.components.feedTypeIcon
+import com.servl.app.ui.theme.TextSecondary
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,7 +52,23 @@ fun AddEditScheduleScreen(
         }
     }
 
-    LaunchedEffect(pets) { if (selectedPetId.isEmpty() && pets.isNotEmpty()) selectedPetId = pets.first().id }
+    // Helper: resolve weight for a given feed type and pet
+    fun weightForType(type: String, petId: String): String {
+        val pet = pets.find { it.id == petId } ?: return weightG
+        return when (type) {
+            "meal"  -> pet.meal_weight_g.toString()
+            "snack" -> pet.snack_weight_g.toString()
+            else    -> weightG
+        }
+    }
+
+    LaunchedEffect(pets) {
+        if (selectedPetId.isEmpty() && pets.isNotEmpty()) {
+            selectedPetId = pets.first().id
+            // Only initialise weight on create; edit flow already populated from existing schedule
+            if (!isEdit) weightG = weightForType(feedType, pets.first().id)
+        }
+    }
 
     val feedTypes = listOf("meal", "snack", "custom")
     val days = listOf(0 to "Sun", 1 to "Mon", 2 to "Tue", 3 to "Wed", 4 to "Thu", 5 to "Fri", 6 to "Sat")
@@ -89,7 +107,11 @@ fun AddEditScheduleScreen(
                         pets.forEach { pet ->
                             DropdownMenuItem(
                                 text = { Text(pet.name) },
-                                onClick = { selectedPetId = pet.id; expanded = false },
+                                onClick = {
+                                    selectedPetId = pet.id
+                                    expanded = false
+                                    if (feedType != "custom") weightG = weightForType(feedType, pet.id)
+                                },
                             )
                         }
                     }
@@ -102,12 +124,26 @@ fun AddEditScheduleScreen(
             Text("Feed type", style = MaterialTheme.typography.labelMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 feedTypes.forEach { t ->
-                    FilterChip(selected = feedType == t, onClick = { feedType = t }, label = { Text(t.replaceFirstChar { it.uppercase() }) })
+                    FilterChip(
+                        selected = feedType == t,
+                        onClick = {
+                            feedType = t
+                            if (t != "custom") weightG = weightForType(t, selectedPetId)
+                        },
+                        label = { Text(t.replaceFirstChar { it.uppercase() }) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = feedTypeIcon(t),
+                                contentDescription = null,
+                                modifier = Modifier.size(FilterChipDefaults.IconSize),
+                            )
+                        },
+                    )
                 }
             }
 
-            if (feedType == "custom") {
-                OutlinedTextField(
+            when (feedType) {
+                "custom" -> OutlinedTextField(
                     value = weightG,
                     onValueChange = { weightG = it },
                     label = { Text("Weight (g)") },
@@ -115,6 +151,17 @@ fun AddEditScheduleScreen(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                 )
+                else -> {
+                    // Show the pet-specific weight as read-only info
+                    val pet = pets.find { it.id == selectedPetId }
+                    if (pet != null) {
+                        Text(
+                            "Weight: ${weightG}g (from ${pet.name}'s settings)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary,
+                        )
+                    }
+                }
             }
 
             // Time picker

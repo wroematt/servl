@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.servl.app.ui.components.StatusChip
+import com.servl.app.ui.components.feedTypeIcon
 import com.servl.app.ui.theme.TextSecondary
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -24,6 +25,10 @@ fun ScheduleScreen(
     viewModel: ScheduleViewModel = hiltViewModel(),
 ) {
     val schedules by viewModel.schedules.collectAsState()
+
+    // Reload every time this screen enters composition — covers both first launch
+    // and returning from AddEditScheduleScreen after a create/update.
+    LaunchedEffect(Unit) { viewModel.load() }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Schedules") }) },
@@ -47,6 +52,13 @@ fun ScheduleScreen(
 
             items(schedules) { schedule ->
                 ListItem(
+                    leadingContent = {
+                        Icon(
+                            imageVector = feedTypeIcon(schedule.feed_type),
+                            contentDescription = schedule.feed_type,
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    },
                     headlineContent = { Text(viewModel.cronToLabel(schedule.cron_expression)) },
                     supportingContent = {
                         Text(

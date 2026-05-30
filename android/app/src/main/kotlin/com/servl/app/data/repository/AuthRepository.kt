@@ -15,14 +15,16 @@ class AuthRepository @Inject constructor(
         val response = api.login(LoginRequest(email, password))
         tokenDataStore.accessToken = response.accessToken
         tokenDataStore.saveRefreshToken(response.refreshToken)
-        return response.user
+        // Token is now stored — getMe() can be used as a fallback if the backend
+        // didn't include the user object in the login response.
+        return response.user ?: api.getMe()
     }
 
     suspend fun register(name: String, email: String, password: String): UserDto {
         val response = api.register(RegisterRequest(name, email, password))
         tokenDataStore.accessToken = response.accessToken
         tokenDataStore.saveRefreshToken(response.refreshToken)
-        return response.user
+        return response.user ?: api.getMe()
     }
 
     suspend fun refreshSession(): UserDto? {

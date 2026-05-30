@@ -3,7 +3,7 @@
     <!-- Splash screen theme — windowBackground matches the app bg colour -->
     <style name="Theme.Servl" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">#F5F4F0</item>
-        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_servl_logo</item>
         <item name="postSplashScreenTheme">@style/Theme.Servl.Main</item>
     </style>
 

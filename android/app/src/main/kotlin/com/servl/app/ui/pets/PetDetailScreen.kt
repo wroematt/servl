@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
 import com.servl.app.ui.components.StatusChip
+import com.servl.app.ui.components.feedTypeIcon
 import com.servl.app.ui.theme.TextSecondary
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -104,10 +105,14 @@ fun PetDetailScreen(
             item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Button(onClick = { viewModel.feedMeal(petId) }, modifier = Modifier.weight(1f)) {
-                        Text("Meal (${pet!!.meal_weight_g}g)")
+                        Icon(feedTypeIcon("meal"), contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Meal · ${pet!!.meal_weight_g}g")
                     }
                     OutlinedButton(onClick = { viewModel.feedSnack(petId) }, modifier = Modifier.weight(1f)) {
-                        Text("Snack (${pet!!.snack_weight_g}g)")
+                        Icon(feedTypeIcon("snack"), contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Snack · ${pet!!.snack_weight_g}g")
                     }
                 }
             }

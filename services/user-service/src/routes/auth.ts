@@ -81,14 +81,16 @@ authRouter.post('/register', async (req: Request, res: Response) => {
 
   const userResult = await db.query(
     `INSERT INTO users (household_id, email, password_hash, name, role)
-     VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING id, household_id, email, name, photo_url, role, fcm_token, created_at`,
     [householdId, email, passwordHash, name, role],
   );
-  const userId: string = userResult.rows[0].id;
+  const newUser = userResult.rows[0];
+  const userId: string = newUser.id;
 
   const accessToken  = issueAccessToken(userId, householdId, role);
   const refreshToken = await issueRefreshToken(userId);
-  return res.status(201).json({ accessToken, refreshToken });
+  return res.status(201).json({ accessToken, refreshToken, user: newUser });
 });
 
 // ── POST /auth/login ───────────────────────────
@@ -101,7 +103,8 @@ authRouter.post('/login', async (req: Request, res: Response) => {
   const { email, password } = body.data;
 
   const result = await db.query(
-    'SELECT id, household_id, password_hash, role FROM users WHERE email = $1',
+    `SELECT id, household_id, email, name, photo_url, role, fcm_token, created_at, password_hash
+     FROM users WHERE email = $1`,
     [email],
   );
   const user = result.rows[0];
@@ -109,9 +112,10 @@ authRouter.post('/login', async (req: Request, res: Response) => {
     return res.status(401).json({ code: 'UNAUTHORIZED', message: 'Invalid credentials' });
   }
 
+  const { password_hash: _, ...userWithoutHash } = user;
   const accessToken  = issueAccessToken(user.id, user.household_id, user.role);
   const refreshToken = await issueRefreshToken(user.id);
-  return res.json({ accessToken, refreshToken });
+  return res.json({ accessToken, refreshToken, user: userWithoutHash });
 });
 
 // ── POST /auth/refresh ─────────────────────────

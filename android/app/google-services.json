@@ -1,25 +1,27 @@
 {
-  "_comment": "Replace this file with the real google-services.json from your Firebase project.",
-  "_instructions": [
-    "1. Go to https://console.firebase.google.com",
-    "2. Open (or create) your Servl project",
-    "3. Add an Android app with package name com.servl.app",
-    "4. Download google-services.json and replace this file"
-  ],
   "project_info": {
-    "project_number": "000000000000",
-    "project_id": "servl-placeholder",
-    "storage_bucket": "servl-placeholder.appspot.com"
+    "project_number": "42503743783",
+    "project_id": "servl-dcbf6",
+    "storage_bucket": "servl-dcbf6.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:000000000000:android:0000000000000000",
-        "android_client_info": { "package_name": "com.servl.app" }
+        "mobilesdk_app_id": "1:42503743783:android:cd89f35a09075aae5aa102",
+        "android_client_info": {
+          "package_name": "com.servl.app"
+        }
       },
-      "api_key": [{ "current_key": "placeholder" }],
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBkM2UogRQr7_mOMsIaF5drwUmSXhjMP1M"
+        }
+      ],
       "services": {
-        "appinvite_service": { "other_platform_oauth_client": [] }
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
       }
     }
   ],

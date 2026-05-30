@@ -10,7 +10,7 @@ data class JoinHouseholdRequest(val token: String)
 data class AuthResponse(
     val accessToken: String,
     val refreshToken: String,
-    val user: UserDto,
+    val user: UserDto?,   // nullable — older backend builds omit this field
 )
 
 data class RefreshResponse(
