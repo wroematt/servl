@@ -38,6 +38,7 @@ val bottomNavItems = listOf(
     BottomNavItem(Screen.Pets,     "Pets",     Icons.Default.Pets),
     BottomNavItem(Screen.Schedule, "Schedule", Icons.Default.CalendarMonth),
     BottomNavItem(Screen.Devices,  "Devices",  Icons.Default.Router),
+    BottomNavItem(Screen.Settings, "Settings", Icons.Default.Settings),
 )
 
 @Composable
@@ -49,7 +50,7 @@ fun MainNavHost(
     val currentBackStack by navController.currentBackStackEntryAsState()
     val currentDestination = currentBackStack?.destination
 
-    // Show bottom bar only for the 4 top-level tabs
+    // Show bottom bar only for the 5 top-level tabs
     val topLevelRoutes = bottomNavItems.map { it.screen.route }.toSet()
     val showBottomBar = currentDestination?.route in topLevelRoutes
 
@@ -89,7 +90,6 @@ fun MainNavHost(
                     authViewModel = authViewModel,
                     onNavigateToPetDetail = { petId -> navController.navigate(Screen.PetDetail.go(petId)) },
                     onNavigateToDevices = { navController.navigate(Screen.Devices.route) },
-                    onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
                 )
             }
             composable(Screen.Pets.route) {

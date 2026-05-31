@@ -3,8 +3,6 @@ package com.servl.app.ui.home
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,7 +27,6 @@ fun HomeScreen(
     authViewModel: AuthViewModel,
     onNavigateToPetDetail: (String) -> Unit,
     onNavigateToDevices: () -> Unit,
-    onNavigateToSettings: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val authState by authViewModel.authState.collectAsState()
@@ -64,12 +61,6 @@ fun HomeScreen(
                             .fillMaxWidth(0.5f)
                             .align(Alignment.Center),
                     )
-                    IconButton(
-                        onClick = onNavigateToSettings,
-                        modifier = Modifier.align(Alignment.CenterEnd),
-                    ) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
-                    }
                 }
             }
         },

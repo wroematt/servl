@@ -20,8 +20,8 @@ android {
         applicationId = "com.servl.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 8
-        versionName = "1.7.0"
+        versionCode = 9
+        versionName = "1.8.0"
 
         // Debug: replace with your PC's local IP when testing on a physical device
         // e.g. "http://192.168.50.41:3000"  (run `ipconfig` on your PC to find it)
