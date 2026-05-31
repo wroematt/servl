@@ -11,8 +11,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
+import android.content.ClipData
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
+import kotlinx.coroutines.launch
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.servl.app.ui.auth.AuthState
@@ -35,7 +37,8 @@ fun HouseholdScreen(
     val timezone by viewModel.timezone.collectAsState()
     val inviteUrl by viewModel.inviteUrl.collectAsState()
     val error by viewModel.error.collectAsState()
-    val clipboard = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
     var copiedInvite by remember { mutableStateOf(false) }
     var memberToRemove by remember { mutableStateOf<com.servl.app.data.network.dto.HouseholdMemberDto?>(null) }
 
@@ -104,7 +107,7 @@ fun HouseholdScreen(
                             singleLine = true,
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = tzDropdownExpanded) },
                             modifier = Modifier
-                                .menuAnchor()
+                                .menuAnchor(MenuAnchorType.PrimaryEditable)
                                 .fillMaxWidth(),
                         )
                         ExposedDropdownMenu(
@@ -209,7 +212,9 @@ fun HouseholdScreen(
                         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(url, style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f), maxLines = 2)
                             TextButton(onClick = {
-                                clipboard.setText(AnnotatedString(url))
+                                scope.launch {
+                                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("invite_url", url)))
+                                }
                                 copiedInvite = true
                             }) { Text(if (copiedInvite) "Copied!" else "Copy") }
                         }

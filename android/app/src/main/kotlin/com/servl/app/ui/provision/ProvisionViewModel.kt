@@ -24,7 +24,7 @@ enum class ProvisionStep { SCAN, CREDENTIALS, PROVISIONING, SUCCESS, ERROR }
 @SuppressLint("MissingPermission")
 @HiltViewModel
 class ProvisionViewModel @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val deviceRepository: DeviceRepository,
 ) : ViewModel() {
 

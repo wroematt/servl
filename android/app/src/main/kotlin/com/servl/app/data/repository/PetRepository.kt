@@ -14,7 +14,7 @@ import javax.inject.Singleton
 @Singleton
 class PetRepository @Inject constructor(
     private val api: ApiService,
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
 ) {
     suspend fun getPets() = api.getPets()
 

@@ -14,7 +14,7 @@ import javax.inject.Singleton
 @Singleton
 class UserRepository @Inject constructor(
     private val api: ApiService,
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
 ) {
     suspend fun getMe(): UserDto = api.getMe()
 
