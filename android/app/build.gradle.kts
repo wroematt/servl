@@ -20,8 +20,8 @@ android {
         applicationId = "com.servl.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 10
-        versionName = "1.9.0"
+        versionCode = 11
+        versionName = "1.9.1"
 
         // Debug: replace with your PC's local IP when testing on a physical device
         // e.g. "http://192.168.50.41:3000"  (run `ipconfig` on your PC to find it)
@@ -45,13 +45,18 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+}
+
+// Kotlin compiler options — replaces deprecated kotlinOptions inside android {}
+// android.builtInKotlin=false means compilerOptions is not available on the
+// android extension; the standalone kotlin-android plugin exposes it here instead.
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
