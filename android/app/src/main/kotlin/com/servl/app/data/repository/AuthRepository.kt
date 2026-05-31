@@ -32,7 +32,7 @@ class AuthRepository @Inject constructor(
         return try {
             val response = api.refresh(RefreshRequest(refreshToken))
             tokenDataStore.accessToken = response.accessToken
-            tokenDataStore.saveRefreshToken(response.refreshToken)
+            response.refreshToken?.let { tokenDataStore.saveRefreshToken(it) }
             api.getMe()
         } catch (e: Exception) {
             tokenDataStore.clearTokens()
