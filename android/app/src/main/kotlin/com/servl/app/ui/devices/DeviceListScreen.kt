@@ -31,6 +31,10 @@ fun DeviceListScreen(
     val authState by authViewModel.authState.collectAsState()
     val isOwner = (authState as? AuthState.Authenticated)?.user?.role == "owner"
 
+    // Refresh immediately whenever this screen enters the composition.
+    // This covers both first entry and returning from DeviceDetailScreen after a delete.
+    LaunchedEffect(Unit) { viewModel.refreshDevices() }
+
     Scaffold(
         topBar = { TopAppBar(title = { Text("Devices") }) },
         floatingActionButton = {

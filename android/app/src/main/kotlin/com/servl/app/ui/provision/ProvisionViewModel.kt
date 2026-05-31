@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
+import java.util.TimeZone
 import javax.inject.Inject
 
 enum class ProvisionStep { SCAN, CREDENTIALS, PROVISIONING, SUCCESS, ERROR }
@@ -76,8 +77,12 @@ class ProvisionViewModel @Inject constructor(
                 val serialNumber = address.replace(":", "")
 
                 // Step 1: register in backend — response includes MQTT credentials.
+                // Include the phone's IANA timezone (e.g. "Europe/London") so the
+                // backend can store it on the household and the schedule worker fires
+                // at the correct local time rather than UTC.
                 _statusMessage.value = "Registering device…"
-                val device = deviceRepository.provisionDevice(deviceName, serialNumber)
+                val timezone = TimeZone.getDefault().id
+                val device = deviceRepository.provisionDevice(deviceName, serialNumber, timezone)
 
                 val mqttUser = device.mqtt_user
                     ?: throw Exception("Backend did not return MQTT credentials")
@@ -103,20 +108,64 @@ class ProvisionViewModel @Inject constructor(
                     mqttPass      = mqttPass,
                 )
 
-                if (bleResult.isFailure) throw bleResult.exceptionOrNull() ?: Exception("BLE provisioning failed")
+                if (bleResult.isFailure) {
+                    val errMsg = bleResult.exceptionOrNull()?.message ?: ""
+                    // Definitive failures — the device explicitly reported an error, or
+                    // credentials were never successfully delivered (write failed, connect
+                    // failed before any data was sent). No point polling the backend.
+                    val isDefinitiveFailure = errMsg.startsWith("ERROR:") ||
+                        errMsg.startsWith("Failed to write") ||
+                        errMsg.startsWith("Device disconnected — ensure") ||
+                        errMsg == "Bluetooth unavailable" ||
+                        errMsg == "Services not discovered" ||
+                        errMsg == "Provisioning service not found on device" ||
+                        // 80 s elapsed with no indication at all — something is seriously
+                        // wrong at the BLE level (device crashed, radio permanently stuck,
+                        // etc.). Don't fall through to backend polling.
+                        errMsg == "Provisioning timed out"
+                    if (isDefinitiveFailure) {
+                        val displayMsg = when (errMsg) {
+                            "ERROR:wifi" -> "Could not connect to WiFi — check your network name and password"
+                            "ERROR:mqtt" -> "WiFi connected but could not reach the MQTT broker — check the broker address"
+                            else         -> errMsg
+                        }
+                        throw Exception(displayMsg)
+                    }
+                    // BLE signal was lost after all credentials were written. This is
+                    // normal on ESP32: the WiFi test for the credentials starves the BLE
+                    // radio so the indication never reaches Android. The device likely
+                    // received everything, saved it, and is rebooting to connect to MQTT.
+                    // Fall through to backend polling below — the heartbeat it publishes
+                    // on boot is the authoritative confirmation.
+                }
 
-                // Step 3: poll for online status
-                _statusMessage.value = "Waiting for device to connect…"
-                withTimeout(60_000) {
-                    while (true) {
-                        delay(3_000)
-                        val updated = deviceRepository.getDevice(device.id)
-                        if (updated.status == "online") {
-                            _provisionedDevice.value = updated
-                            _step.value = ProvisionStep.SUCCESS
-                            return@withTimeout
+                // Step 3: poll GET /devices/{id} until status == "online".
+                // Runs whether BLE succeeded (fast path — device confirmed via indication)
+                // or fell through from a radio-contention disconnect (reliable path via
+                // backend heartbeat, typically arrives within 10 s of device reboot).
+                _statusMessage.value = if (bleResult.isSuccess) {
+                    "Waiting for device to connect…"
+                } else {
+                    "BLE signal lost — checking if device connected to network…"
+                }
+                var pollingSucceeded = false
+                try {
+                    withTimeout(60_000) {
+                        while (true) {
+                            delay(3_000)
+                            val updated = deviceRepository.getDevice(device.id)
+                            if (updated.status == "online") {
+                                _provisionedDevice.value = updated
+                                pollingSucceeded = true
+                                _step.value = ProvisionStep.SUCCESS
+                                return@withTimeout
+                            }
                         }
                     }
+                } catch (_: kotlinx.coroutines.TimeoutCancellationException) { }
+
+                if (!pollingSucceeded) {
+                    throw Exception("Device did not come online — check your WiFi credentials and that the device has power")
                 }
             } catch (e: Exception) {
                 _statusMessage.value = e.message ?: "Provisioning failed"

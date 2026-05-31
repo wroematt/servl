@@ -170,6 +170,51 @@ usersRouter.post('/household/join', async (req: Request, res: Response) => {
   return res.json({ accessToken, refreshToken });
 });
 
+// ── GET /users/household/settings ─────────────
+// Returns household-level settings (timezone) visible to all members.
+
+usersRouter.get('/household/settings', async (req: Request, res: Response) => {
+  const { householdId } = getHeaders(req);
+  if (!householdId) {
+    return res.status(400).json({ code: 'NO_HOUSEHOLD', message: 'User has no household' });
+  }
+  const result = await db.query(
+    'SELECT timezone FROM households WHERE id = $1',
+    [householdId],
+  );
+  if (!result.rows[0]) return res.status(404).json({ code: 'NOT_FOUND', message: 'Household not found' });
+  return res.json({ timezone: result.rows[0].timezone });
+});
+
+// ── PATCH /users/household/settings ───────────
+// Updates household-level settings. Owner only.
+
+const updateHouseholdSettingsSchema = z.object({
+  timezone: z.string().max(64),
+});
+
+usersRouter.patch('/household/settings', async (req: Request, res: Response) => {
+  const { householdId, role } = getHeaders(req);
+  if (!householdId) {
+    return res.status(400).json({ code: 'NO_HOUSEHOLD', message: 'User has no household' });
+  }
+  if (role !== 'owner') {
+    return res.status(403).json({ code: 'FORBIDDEN', message: 'Owner role required' });
+  }
+  const body = updateHouseholdSettingsSchema.safeParse(req.body);
+  if (!body.success) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'Invalid request', details: body.error.flatten() });
+  }
+  // Validate the string is a real IANA timezone before persisting.
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: body.data.timezone });
+  } catch {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'Invalid timezone — use an IANA timezone string (e.g. Europe/London)' });
+  }
+  await db.query('UPDATE households SET timezone = $1 WHERE id = $2', [body.data.timezone, householdId]);
+  return res.json({ timezone: body.data.timezone });
+});
+
 // ── PATCH /users/:userId/role ──────────────────
 
 usersRouter.patch('/:userId/role', async (req: Request, res: Response) => {

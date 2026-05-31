@@ -10,7 +10,8 @@ struct PendingCommand {
 };
 
 // Set by the message callback; cleared by main.cpp after the command is handled.
-extern volatile bool g_commandPending;
+extern volatile bool  g_commandPending;
+extern volatile bool  g_factoryResetPending;   // set when broker sends action=factory_reset
 extern PendingCommand g_pendingCommand;
 
 // ─── API ─────────────────────────────────────────────────────────────────────

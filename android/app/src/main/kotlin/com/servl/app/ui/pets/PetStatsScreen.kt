@@ -20,7 +20,10 @@ import com.patrykandpatrick.vico.compose.cartesian.layer.rememberColumnCartesian
 import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
 import com.patrykandpatrick.vico.core.cartesian.data.CartesianChartModelProducer
 import com.patrykandpatrick.vico.core.cartesian.data.columnSeries
+import com.patrykandpatrick.vico.core.cartesian.data.CartesianValueFormatter
 import com.servl.app.ui.theme.TextSecondary
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter as JavaDateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,6 +34,25 @@ fun PetStatsScreen(
 ) {
     val stats by viewModel.stats.collectAsState()
     val modelProducer = remember { CartesianChartModelProducer() }
+
+    // Short date labels for the chart x-axis: "5 Jan", "12 Jan", etc.
+    val shortDateFmt = remember { JavaDateTimeFormatter.ofPattern("d MMM") }
+    // Full display format for the list rows: "15 Jan 2024"
+    val listDateFmt = remember { JavaDateTimeFormatter.ofPattern("d MMM yyyy") }
+
+    // Derive date labels once per stats update.
+    val dateLabels = remember(stats) {
+        stats.map { day ->
+            runCatching { LocalDate.parse(day.date).format(shortDateFmt) }.getOrDefault(day.date)
+        }
+    }
+
+    val xAxisFormatter = remember(dateLabels) {
+        CartesianValueFormatter { _, x, _ ->
+            val i = x.toInt()
+            if (i in dateLabels.indices) dateLabels[i] else ""
+        }
+    }
 
     LaunchedEffect(petId) { viewModel.loadStats(petId) }
 
@@ -69,10 +91,15 @@ fun PetStatsScreen(
                                 chart = rememberCartesianChart(
                                     rememberColumnCartesianLayer(),
                                     startAxis = VerticalAxis.rememberStart(),
-                                    bottomAxis = HorizontalAxis.rememberBottom(),
+                                    bottomAxis = HorizontalAxis.rememberBottom(
+                                        valueFormatter = xAxisFormatter,
+                                        // Show at most one label per 7 data points to avoid crowding.
+                                        itemPlacer = HorizontalAxis.ItemPlacer.aligned(spacing = { 7 }),
+                                        labelRotationDegrees = -45f,
+                                    ),
                                 ),
                                 modelProducer = modelProducer,
-                                modifier = Modifier.fillMaxWidth().height(200.dp),
+                                modifier = Modifier.fillMaxWidth().height(220.dp),
                             )
                         }
                     }
@@ -81,7 +108,7 @@ fun PetStatsScreen(
 
             item {
                 // Summary row
-                val total   = stats.sumOf { it.total_g }
+                val total    = stats.sumOf { it.total_g }
                 val avgDaily = if (stats.isNotEmpty()) total / stats.size else 0
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     StatCard("Total", "${total}g", Modifier.weight(1f))
@@ -91,8 +118,13 @@ fun PetStatsScreen(
             }
 
             items(stats) { day ->
+                // day.date is "2024-01-15" from the API (::text cast) — show as "15 Jan 2024"
+                val displayDate = runCatching {
+                    LocalDate.parse(day.date).format(listDateFmt)
+                }.getOrDefault(day.date)
+
                 ListItem(
-                    headlineContent = { Text(day.date) },
+                    headlineContent = { Text(displayDate) },
                     trailingContent = {
                         Column(horizontalAlignment = Alignment.End) {
                             Text("${day.total_g}g", style = MaterialTheme.typography.bodyMedium)

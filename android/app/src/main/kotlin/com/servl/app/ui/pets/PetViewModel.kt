@@ -82,13 +82,14 @@ class PetViewModel @Inject constructor(
     }
 
     fun createPet(
-        name: String, type: String, mealWeightG: Int, snackWeightG: Int, dailyTargetG: Int, photoUri: Uri?,
+        name: String, type: String, mealWeightG: Int, snackWeightG: Int, dailyTargetG: Int,
+        photoUri: Uri?, deviceId: String? = null,
         onSuccess: () -> Unit,
     ) {
         viewModelScope.launch {
             _error.value = null
             try {
-                petRepository.createPet(name, type, mealWeightG, snackWeightG, dailyTargetG, photoUri)
+                petRepository.createPet(name, type, mealWeightG, snackWeightG, dailyTargetG, photoUri, deviceId)
                 loadPets()
                 onSuccess()
             } catch (e: Exception) { _error.value = e.message ?: "Failed to create pet" }
@@ -96,13 +97,14 @@ class PetViewModel @Inject constructor(
     }
 
     fun updatePet(
-        petId: String, name: String, type: String, mealWeightG: Int, snackWeightG: Int, dailyTargetG: Int, photoUri: Uri?,
+        petId: String, name: String, type: String, mealWeightG: Int, snackWeightG: Int, dailyTargetG: Int,
+        photoUri: Uri?, deviceId: String? = null,
         onSuccess: () -> Unit,
     ) {
         viewModelScope.launch {
             _error.value = null
             try {
-                petRepository.updatePet(petId, name, type, mealWeightG, snackWeightG, dailyTargetG, photoUri)
+                petRepository.updatePet(petId, name, type, mealWeightG, snackWeightG, dailyTargetG, photoUri, deviceId)
                 loadPet(petId)
                 onSuccess()
             } catch (e: Exception) { _error.value = e.message ?: "Failed to update pet" }

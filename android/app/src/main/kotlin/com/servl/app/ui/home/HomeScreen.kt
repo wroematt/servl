@@ -165,8 +165,8 @@ fun HomeScreen(
             }
 
             items(todayFeeds) { event ->
-                val time = remember(event.created_at) {
-                    runCatching { timeFormatter.format(Instant.parse(event.created_at)) }.getOrDefault("--:--")
+                val time = remember(event.dispensed_at) {
+                    runCatching { timeFormatter.format(Instant.parse(event.dispensed_at)) }.getOrDefault("--:--")
                 }
                 val petName = pets.find { it.id == event.pet_id }?.name ?: "Unknown"
                 ListItem(

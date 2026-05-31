@@ -20,6 +20,12 @@ class SettingsViewModel @Inject constructor(
     private val _members = MutableStateFlow<List<HouseholdMemberDto>>(emptyList())
     val members: StateFlow<List<HouseholdMemberDto>> = _members.asStateFlow()
 
+    // null  = still loading
+    // ""    = failed to load (column missing, network error, etc.)
+    // value = actual IANA timezone string
+    private val _timezone = MutableStateFlow<String?>(null)
+    val timezone: StateFlow<String?> = _timezone.asStateFlow()
+
     private val _inviteUrl = MutableStateFlow<String?>(null)
     val inviteUrl: StateFlow<String?> = _inviteUrl.asStateFlow()
 
@@ -33,6 +39,23 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             try { _members.value = userRepository.getHousehold() }
             catch (e: Exception) { _error.value = e.message }
+        }
+    }
+
+    fun loadTimezone() {
+        viewModelScope.launch {
+            try { _timezone.value = userRepository.getHouseholdSettings().timezone }
+            catch (_: Exception) { _timezone.value = "" }  // "" = load failed
+        }
+    }
+
+    fun updateTimezone(timezone: String) {
+        viewModelScope.launch {
+            try {
+                _timezone.value = userRepository.updateHouseholdTimezone(timezone).timezone
+            } catch (e: Exception) {
+                _error.value = e.message ?: "Failed to update timezone"
+            }
         }
     }
 

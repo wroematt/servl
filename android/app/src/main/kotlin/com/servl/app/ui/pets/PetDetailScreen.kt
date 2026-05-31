@@ -103,16 +103,34 @@ fun PetDetailScreen(
 
             // Quick feed buttons
             item {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(onClick = { viewModel.feedMeal(petId) }, modifier = Modifier.weight(1f)) {
-                        Icon(feedTypeIcon("meal"), contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Meal · ${pet!!.meal_weight_g}g")
+                val hasDevice = pet!!.device_id != null
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Button(
+                            onClick = { viewModel.feedMeal(petId) },
+                            modifier = Modifier.weight(1f),
+                            enabled = hasDevice,
+                        ) {
+                            Icon(feedTypeIcon("meal"), contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Meal · ${pet!!.meal_weight_g}g")
+                        }
+                        OutlinedButton(
+                            onClick = { viewModel.feedSnack(petId) },
+                            modifier = Modifier.weight(1f),
+                            enabled = hasDevice,
+                        ) {
+                            Icon(feedTypeIcon("snack"), contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Snack · ${pet!!.snack_weight_g}g")
+                        }
                     }
-                    OutlinedButton(onClick = { viewModel.feedSnack(petId) }, modifier = Modifier.weight(1f)) {
-                        Icon(feedTypeIcon("snack"), contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Snack · ${pet!!.snack_weight_g}g")
+                    if (!hasDevice) {
+                        Text(
+                            "Assign a feeder device in pet settings to enable quick feeds.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary,
+                        )
                     }
                 }
             }

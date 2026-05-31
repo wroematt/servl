@@ -36,6 +36,9 @@ data class DeviceEventsResponse(
 data class ProvisionDeviceRequest(
     val name: String,
     val serial_number: String,
+    /** IANA timezone of the provisioning device (e.g. "Europe/London").
+     *  Stored on the household so the schedule worker fires at correct local time. */
+    val timezone: String,
 )
 
 data class UpdateDeviceRequest(val name: String)

@@ -9,8 +9,9 @@
 #include <ArduinoJson.h>
 
 // ─── Global command state (declared in mqtt_conn.h) ──────────────────────────
-volatile bool  g_commandPending  = false;
-PendingCommand g_pendingCommand  = {};
+volatile bool  g_commandPending      = false;
+volatile bool  g_factoryResetPending = false;
+PendingCommand g_pendingCommand      = {};
 
 // ─── Module-level state ───────────────────────────────────────────────────────
 static WiFiClient    s_wifiClient;
@@ -36,10 +37,21 @@ static void onMessage(const char* topic, uint8_t* payload, unsigned int length) 
         return;
     }
 
-    // We only handle dispense commands.
     const char* action = doc["action"];
-    if (!action || strcmp(action, "dispense") != 0) {
-        log_w("[mqtt] Unknown action: %s", action ? action : "(null)");
+    if (!action) {
+        log_w("[mqtt] Message missing 'action' field");
+        return;
+    }
+
+    // Factory reset — wipe NVS and reboot into provisioning mode.
+    if (strcmp(action, "factory_reset") == 0) {
+        log_w("[mqtt] Factory reset command received from broker");
+        g_factoryResetPending = true;
+        return;
+    }
+
+    if (strcmp(action, "dispense") != 0) {
+        log_w("[mqtt] Unknown action: %s", action);
         return;
     }
 
@@ -83,9 +95,24 @@ bool mqtt_connect(const Credentials& creds) {
     s_mqtt.setCallback(onMessage);
     s_mqtt.setKeepAlive(60);
 
+    // LWT is published by the broker if this client disconnects unexpectedly
+    // (power-loss, WiFi drop, etc.). The device-service MQTT handler treats an
+    // LWT status message the same as a normal status message and marks the device offline.
+    String lwtPayload = "{\"status\":\"offline\",\"hopper_pct\":0,\"firmware_version\":\"";
+    lwtPayload += FIRMWARE_VERSION;
+    lwtPayload += "\"}";
+
     uint32_t deadline = millis() + MQTT_CONNECT_TIMEOUT_MS;
     while (!s_mqtt.connected() && millis() < deadline) {
-        if (s_mqtt.connect(creds.mqtt_client_id, creds.mqtt_user, creds.mqtt_pass)) {
+        if (s_mqtt.connect(
+                creds.mqtt_client_id,
+                creds.mqtt_user,
+                creds.mqtt_pass,
+                s_statusTopic.c_str(),   // LWT topic
+                /*willQos=*/1,
+                /*willRetain=*/false,
+                lwtPayload.c_str()       // LWT message
+            )) {
             log_i("[mqtt] Connected");
             s_mqtt.subscribe(s_cmdTopic.c_str(), /*qos=*/1);
             log_i("[mqtt] Subscribed to %s", s_cmdTopic.c_str());

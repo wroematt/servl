@@ -2,9 +2,10 @@
 #include <Arduino.h>    // uint8_t, uint32_t, etc. from the ESP32 toolchain
 
 // ─── Hardware pins ───────────────────────────────────────────────────────────
-// GPIO2  = built-in LED on most ESP32-WROOM / ESP32 DevKit boards (active HIGH)
+// GPIO27 = external LED (active HIGH).  GPIO2 (built-in) was not reliably
+//          usable on this board variant so an external LED on GPIO27 is used.
 // GPIO0  = BOOT button (active LOW)
-constexpr uint8_t PIN_LED    = 2;
+constexpr uint8_t PIN_LED    = 27;
 constexpr uint8_t PIN_BUTTON = 0;
 
 // ─── Timing ──────────────────────────────────────────────────────────────────
@@ -30,7 +31,7 @@ constexpr uint32_t MQTT_CONNECT_TIMEOUT_MS =  8000;
 constexpr int MQTT_MAX_PACKET = 512;
 
 // ─── Firmware identity ───────────────────────────────────────────────────────
-constexpr char FIRMWARE_VERSION[] = "1.0.0";
+constexpr char FIRMWARE_VERSION[] = "1.2.0";
 
 // BLE device name prefix — last 4 hex digits of MAC are appended at runtime
 // so multiple units can be distinguished (e.g. "Servl-A1B2").

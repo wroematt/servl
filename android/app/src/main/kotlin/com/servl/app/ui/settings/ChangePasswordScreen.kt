@@ -1,16 +1,14 @@
 package com.servl.app.ui.settings
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.servl.app.ui.components.PasswordTextField
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,32 +34,23 @@ fun ChangePasswordScreen(
             Modifier.fillMaxSize().padding(padding).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            OutlinedTextField(
+            PasswordTextField(
                 value = currentPw,
                 onValueChange = { currentPw = it; viewModel.clearMessages() },
-                label = { Text("Current password") },
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                label = "Current password",
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
             )
-            OutlinedTextField(
+            PasswordTextField(
                 value = newPw,
                 onValueChange = { newPw = it; viewModel.clearMessages() },
-                label = { Text("New password") },
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                label = "New password",
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
             )
-            OutlinedTextField(
+            PasswordTextField(
                 value = confirmPw,
                 onValueChange = { confirmPw = it; viewModel.clearMessages() },
-                label = { Text("Confirm new password") },
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                label = "Confirm new password",
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
             )
 
             error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }

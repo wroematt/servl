@@ -112,8 +112,8 @@ export interface DeviceEvent {
 // ── MQTT message payloads ─────────────────────
 
 export interface MqttCommandPayload {
-  command_id: string;       // feed_event.id — used to confirm back
-  action: 'dispense';
+  command_id: string;       // feed_event.id — used to confirm back, or 'factory_reset'
+  action: 'dispense' | 'factory_reset';
   weight_g: number;
 }
 
@@ -121,7 +121,7 @@ export interface MqttStatusPayload {
   command_id?: string;      // present when confirming a dispense
   hopper_pct: number;
   dispensed_g?: number;     // actual weight dispensed
-  status: 'ok' | 'error' | 'low_hopper';
+  status: 'ok' | 'error' | 'low_hopper' | 'offline';   // 'offline' = broker LWT
   firmware_version?: string;
   error_message?: string;
 }

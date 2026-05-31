@@ -28,3 +28,7 @@ data class HouseholdMemberDto(
 )
 
 data class InviteResponse(val inviteUrl: String)
+
+data class HouseholdSettingsDto(val timezone: String)
+
+data class UpdateHouseholdSettingsRequest(val timezone: String)

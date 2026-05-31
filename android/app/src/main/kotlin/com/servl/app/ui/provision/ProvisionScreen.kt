@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -17,11 +16,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.servl.app.ble.BlePermissions
+import com.servl.app.ui.components.PasswordTextField
 import com.servl.app.ui.theme.Success
 import com.servl.app.ui.theme.TextSecondary
 
@@ -151,14 +149,11 @@ private fun CredentialsStep(
         Text("WiFi network", style = MaterialTheme.typography.titleSmall)
 
         OutlinedTextField(value = ssid, onValueChange = { ssid = it }, label = { Text("Network name (SSID)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-        OutlinedTextField(
+        PasswordTextField(
             value = wifiPassword,
             onValueChange = { wifiPassword = it },
-            label = { Text("Password") },
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            label = "Password",
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
         )
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {

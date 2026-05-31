@@ -40,6 +40,13 @@ class DeviceViewModel @Inject constructor(
         }
     }
 
+    /** One-shot refresh — called when the list screen becomes visible after navigating back. */
+    fun refreshDevices() {
+        viewModelScope.launch {
+            try { _devices.value = deviceRepository.getDevices() } catch (_: Exception) {}
+        }
+    }
+
     // Poll a specific device every 15s
     fun startPollingDevice(deviceId: String) {
         viewModelScope.launch {

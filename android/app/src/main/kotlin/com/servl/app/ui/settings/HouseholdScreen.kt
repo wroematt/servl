@@ -5,6 +5,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,6 +19,7 @@ import com.servl.app.ui.auth.AuthState
 import com.servl.app.ui.auth.AuthViewModel
 import com.servl.app.ui.components.StatusChip
 import com.servl.app.ui.theme.TextSecondary
+import java.util.TimeZone
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -29,14 +32,119 @@ fun HouseholdScreen(
     val user = (authState as? AuthState.Authenticated)?.user
     val isOwner = user?.role == "owner"
     val members by viewModel.members.collectAsState()
+    val timezone by viewModel.timezone.collectAsState()
     val inviteUrl by viewModel.inviteUrl.collectAsState()
     val error by viewModel.error.collectAsState()
     val clipboard = LocalClipboardManager.current
     var copiedInvite by remember { mutableStateOf(false) }
     var memberToRemove by remember { mutableStateOf<com.servl.app.data.network.dto.HouseholdMemberDto?>(null) }
 
-    LaunchedEffect(Unit) { viewModel.loadMembers() }
+    // Timezone dialog state
+    var showTimezoneDialog by remember { mutableStateOf(false) }
+    var tzSearch by remember { mutableStateOf("") }
+    var tzDropdownExpanded by remember { mutableStateOf(false) }
 
+    // Full list computed once — filtered to "Continent/City" format, sorted
+    val allTimezones: List<String> = remember {
+        TimeZone.getAvailableIDs()
+            .filter { id ->
+                id.contains('/') &&
+                !id.startsWith("Etc/") &&
+                !id.startsWith("SystemV/") &&
+                !id.startsWith("US/")
+            }
+            .sorted()
+    }
+
+    // Filtered results: if search is blank show phone TZ first then first 19 alphabetically;
+    // otherwise show up to 20 case-insensitive matches.
+    val filteredTimezones: List<String> = remember(tzSearch) {
+        if (tzSearch.isBlank()) {
+            val phone = TimeZone.getDefault().id
+            listOf(phone) + allTimezones.filter { it != phone }.take(19)
+        } else {
+            allTimezones.filter { it.contains(tzSearch, ignoreCase = true) }.take(20)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.loadMembers()
+        viewModel.loadTimezone()
+    }
+
+    // Auto-correct: if household is still on the 'UTC' default and the user is an owner,
+    // silently update to the phone's local timezone.
+    LaunchedEffect(timezone) {
+        if (timezone == "UTC" && isOwner) {
+            val phone = TimeZone.getDefault().id
+            if (phone != "UTC") viewModel.updateTimezone(phone)
+        }
+    }
+
+    // ── Timezone dialog ─────────────────────────────────────────────────────────
+    if (showTimezoneDialog) {
+        AlertDialog(
+            onDismissRequest = { showTimezoneDialog = false },
+            title = { Text("Household timezone") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Schedules fire at the time shown in this timezone.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary,
+                    )
+                    ExposedDropdownMenuBox(
+                        expanded = tzDropdownExpanded,
+                        onExpandedChange = { tzDropdownExpanded = it },
+                    ) {
+                        OutlinedTextField(
+                            value = tzSearch,
+                            onValueChange = { tzSearch = it; tzDropdownExpanded = true },
+                            label = { Text("Search timezone") },
+                            singleLine = true,
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = tzDropdownExpanded) },
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth(),
+                        )
+                        ExposedDropdownMenu(
+                            expanded = tzDropdownExpanded && filteredTimezones.isNotEmpty(),
+                            onDismissRequest = { tzDropdownExpanded = false },
+                        ) {
+                            filteredTimezones.forEach { tz ->
+                                DropdownMenuItem(
+                                    text = { Text(tz, style = MaterialTheme.typography.bodyMedium) },
+                                    onClick = { tzSearch = tz; tzDropdownExpanded = false },
+                                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
+                                )
+                            }
+                        }
+                    }
+                    TextButton(
+                        onClick = {
+                            tzSearch = TimeZone.getDefault().id
+                            tzDropdownExpanded = false
+                        },
+                        contentPadding = PaddingValues(0.dp),
+                    ) {
+                        Text(
+                            "Use phone timezone (${TimeZone.getDefault().id})",
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.updateTimezone(tzSearch); showTimezoneDialog = false },
+                    enabled = tzSearch.isNotBlank(),
+                ) { Text("Save") }
+            },
+            dismissButton = { TextButton(onClick = { showTimezoneDialog = false }) { Text("Cancel") } },
+        )
+    }
+
+    // ── Remove member dialog ────────────────────────────────────────────────────
     memberToRemove?.let { m ->
         AlertDialog(
             onDismissRequest = { memberToRemove = null },
@@ -63,9 +171,38 @@ fun HouseholdScreen(
             )
         },
     ) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyColumn(
+            Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
 
-            // Invite URL card
+            // ── Timezone row ──────────────────────────────────────────────
+            item {
+                ListItem(
+                    headlineContent = { Text("Schedule timezone") },
+                    supportingContent = {
+                        when (timezone) {
+                            null -> Text("Loading…", color = TextSecondary)
+                            ""   -> Text("Not available", color = TextSecondary)
+                            else -> Text(timezone!!, color = TextSecondary)
+                        }
+                    },
+                    leadingContent  = { Icon(Icons.Default.Schedule, contentDescription = null) },
+                    trailingContent = if (isOwner) ({
+                        IconButton(onClick = {
+                            tzSearch = timezone?.takeIf { it.isNotEmpty() } ?: TimeZone.getDefault().id
+                            tzDropdownExpanded = false
+                            showTimezoneDialog = true
+                        }) {
+                            Icon(Icons.Default.Edit, contentDescription = "Edit timezone")
+                        }
+                    }) else null,
+                )
+                HorizontalDivider()
+            }
+
+            // ── Invite URL card ───────────────────────────────────────────
             inviteUrl?.let { url ->
                 item {
                     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
@@ -82,7 +219,7 @@ fun HouseholdScreen(
 
             error?.let { item { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) } }
 
-            // Members list
+            // ── Members list ──────────────────────────────────────────────
             items(members) { member ->
                 val isSelf = member.id == user?.id
                 val canManage = isOwner && !isSelf

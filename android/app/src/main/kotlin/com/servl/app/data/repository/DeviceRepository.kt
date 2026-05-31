@@ -12,8 +12,8 @@ class DeviceRepository @Inject constructor(private val api: ApiService) {
 
     suspend fun getDevice(deviceId: String) = api.getDevice(deviceId)
 
-    suspend fun provisionDevice(name: String, serialNumber: String) =
-        api.provisionDevice(ProvisionDeviceRequest(name, serialNumber))
+    suspend fun provisionDevice(name: String, serialNumber: String, timezone: String) =
+        api.provisionDevice(ProvisionDeviceRequest(name, serialNumber, timezone))
 
     suspend fun updateDevice(deviceId: String, name: String) =
         api.updateDevice(deviceId, UpdateDeviceRequest(name))

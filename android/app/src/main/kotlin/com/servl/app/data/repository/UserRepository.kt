@@ -36,6 +36,11 @@ class UserRepository @Inject constructor(
 
     suspend fun getHousehold() = api.getHousehold()
 
+    suspend fun getHouseholdSettings() = api.getHouseholdSettings()
+
+    suspend fun updateHouseholdTimezone(timezone: String) =
+        api.updateHouseholdSettings(UpdateHouseholdSettingsRequest(timezone))
+
     suspend fun generateInvite() = api.generateInvite()
 
     suspend fun joinHousehold(token: String) = api.joinHousehold(JoinHouseholdRequest(token))

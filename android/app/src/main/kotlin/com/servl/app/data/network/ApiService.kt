@@ -42,6 +42,12 @@ interface ApiService {
     @GET("users/household")
     suspend fun getHousehold(): List<HouseholdMemberDto>
 
+    @GET("users/household/settings")
+    suspend fun getHouseholdSettings(): HouseholdSettingsDto
+
+    @PATCH("users/household/settings")
+    suspend fun updateHouseholdSettings(@Body req: UpdateHouseholdSettingsRequest): HouseholdSettingsDto
+
     @POST("users/household/invite")
     suspend fun generateInvite(): InviteResponse
 
@@ -83,7 +89,7 @@ interface ApiService {
     @PATCH("pets/{petId}")
     suspend fun updatePet(
         @Path("petId") petId: String,
-        @Body req: Map<String, @JvmSuppressWildcards Any>,
+        @Body req: Map<String, @JvmSuppressWildcards Any?>,
     ): PetDto
 
     @DELETE("pets/{petId}")

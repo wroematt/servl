@@ -21,12 +21,13 @@ data class FeedEventDto(
     val pet_id: String?,
     val device_id: String?,
     val triggered_by: String?,
+    val triggered_by_name: String?,  // joined from users table; null for scheduled/voice
     val schedule_id: String?,
     val weight_requested_g: Int,
     val weight_dispensed_g: Int?,
-    val trigger_type: String,       // "manual" | "schedule" | "voice" | "api"
-    val status: String,             // "pending" | "confirmed" | "failed" | "timeout"
-    val created_at: String,
+    val trigger_type: String,        // "manual" | "schedule" | "voice" | "api"
+    val status: String,              // "pending" | "confirmed" | "failed" | "timeout"
+    val dispensed_at: String,
 )
 
 data class FeedHistoryResponse(

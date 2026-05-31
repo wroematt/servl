@@ -18,6 +18,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
+import com.servl.app.ui.devices.DeviceViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -26,32 +27,38 @@ fun AddEditPetScreen(
     onSuccess: () -> Unit,
     onNavigateBack: () -> Unit,
     viewModel: PetViewModel = hiltViewModel(),
+    deviceViewModel: DeviceViewModel = hiltViewModel(),
 ) {
     val isEdit = petId != null
     val selectedPet by viewModel.selectedPet.collectAsState()
     val error by viewModel.error.collectAsState()
+    val devices by deviceViewModel.devices.collectAsState()
 
-    var name        by remember { mutableStateOf("") }
-    var type        by remember { mutableStateOf("cat") }
-    var mealWeight  by remember { mutableStateOf("80") }
-    var snackWeight by remember { mutableStateOf("40") }
-    var dailyTarget by remember { mutableStateOf("200") }
-    var photoUri    by remember { mutableStateOf<Uri?>(null) }
+    var name            by remember { mutableStateOf("") }
+    var type            by remember { mutableStateOf("cat") }
+    var mealWeight      by remember { mutableStateOf("80") }
+    var snackWeight     by remember { mutableStateOf("40") }
+    var dailyTarget     by remember { mutableStateOf("200") }
+    var photoUri        by remember { mutableStateOf<Uri?>(null) }
+    var selectedDeviceId by remember { mutableStateOf<String?>(null) }
+    var deviceMenuExpanded by remember { mutableStateOf(false) }
 
+    // Load the pet being edited and the current device list.
     LaunchedEffect(petId) {
-        if (isEdit) {
-            viewModel.loadPet(petId!!)
-        }
+        if (isEdit) viewModel.loadPet(petId!!)
+        deviceViewModel.refreshDevices()
     }
 
+    // Pre-fill fields once the pet data arrives.
     LaunchedEffect(selectedPet) {
         selectedPet?.let { p ->
             if (isEdit && name.isEmpty()) {
-                name        = p.name
-                type        = p.type
-                mealWeight  = p.meal_weight_g.toString()
-                snackWeight = p.snack_weight_g.toString()
-                dailyTarget = p.daily_target_g.toString()
+                name             = p.name
+                type             = p.type
+                mealWeight       = p.meal_weight_g.toString()
+                snackWeight      = p.snack_weight_g.toString()
+                dailyTarget      = p.daily_target_g.toString()
+                selectedDeviceId = p.device_id
             }
         }
     }
@@ -135,6 +142,37 @@ fun AddEditPetScreen(
                 )
             }
 
+            // Device picker — only shown if at least one device is provisioned.
+            if (devices.isNotEmpty()) {
+                Text("Feeder device", style = MaterialTheme.typography.labelMedium)
+                ExposedDropdownMenuBox(
+                    expanded = deviceMenuExpanded,
+                    onExpandedChange = { deviceMenuExpanded = !deviceMenuExpanded },
+                ) {
+                    val selectedLabel = devices.firstOrNull { it.id == selectedDeviceId }?.name ?: "None"
+                    OutlinedTextField(
+                        value = selectedLabel,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Assign to feeder") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = deviceMenuExpanded) },
+                        modifier = Modifier.menuAnchor().fillMaxWidth(),
+                    )
+                    ExposedDropdownMenu(expanded = deviceMenuExpanded, onDismissRequest = { deviceMenuExpanded = false }) {
+                        DropdownMenuItem(
+                            text = { Text("None") },
+                            onClick = { selectedDeviceId = null; deviceMenuExpanded = false },
+                        )
+                        devices.forEach { device ->
+                            DropdownMenuItem(
+                                text = { Text(device.name) },
+                                onClick = { selectedDeviceId = device.id; deviceMenuExpanded = false },
+                            )
+                        }
+                    }
+                }
+            }
+
             error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
 
             Button(
@@ -143,9 +181,9 @@ fun AddEditPetScreen(
                     val snack   = snackWeight.toIntOrNull() ?: return@Button
                     val target  = dailyTarget.toIntOrNull() ?: return@Button
                     if (isEdit) {
-                        viewModel.updatePet(petId!!, name, type, meal, snack, target, photoUri, onSuccess)
+                        viewModel.updatePet(petId!!, name, type, meal, snack, target, photoUri, selectedDeviceId, onSuccess)
                     } else {
-                        viewModel.createPet(name, type, meal, snack, target, photoUri, onSuccess)
+                        viewModel.createPet(name, type, meal, snack, target, photoUri, selectedDeviceId, onSuccess)
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),

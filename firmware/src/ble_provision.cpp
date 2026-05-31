@@ -16,19 +16,48 @@ static const char* UUID_STATUS_NOTIFY  = "0000FE05-5345-524C-0000-534552564C31";
 static NimBLECharacteristic* s_statusNotifyChar = nullptr;
 static volatile bool          s_commitPending   = false;
 static NimBLEServer*          s_bleServer        = nullptr;
+// Set to true before ble_provision_stop() so onDisconnect() does not try to
+// restart advertising while the BLE stack is being torn down.
+static volatile bool          s_stopping         = false;
 
 // Working credential buffer — populated by GATT write callbacks.
 static Credentials s_pendingCreds = {};
 
 // ─── Server callbacks ─────────────────────────────────────────────────────────
 class ProvisionServerCallbacks : public NimBLEServerCallbacks {
-    void onConnect(NimBLEServer* pServer) override {
-        log_i("[ble] Client connected");
+    // Use the ble_gap_conn_desc overload so we have the connection handle.
+    void onConnect(NimBLEServer* pServer, ble_gap_conn_desc* desc) override {
+        log_i("[ble] Client connected  handle=0x%04X", desc->conn_handle);
+
+        // The ESP32 shares one 2.4 GHz radio between WiFi and BLE.  When the
+        // credential test starts (WiFi scan + associate) the radio is heavily
+        // used by WiFi, causing BLE to miss connection events.  The default
+        // supervision timeout of ~5 s is too short — the link drops before
+        // WiFi even finishes associating.
+        //
+        // Request connection parameters with a 64 s supervision timeout so BLE
+        // can survive the full test window AND the WiFi radio-cleanup delay.
+        //
+        // Worst-case timeline when WiFi credentials are wrong:
+        //   WiFi test timeout  : 15 s  (WIFI_CONNECT_TIMEOUT_MS)
+        //   WiFi stack cleanup : ~17 s  (E wifi:timeout when WiFi un-init)
+        //   Total radio blocked: ~32 s — the old 32 s timeout fired right at this edge.
+        //
+        //   minInterval / maxInterval : 32–48 × 1.25 ms ≈ 40–60 ms
+        //   latency                   : 0 (no skipped events)
+        //   timeout                   : 6400 × 10 ms = 64 s
+        pServer->updateConnParams(desc->conn_handle, 32, 48, 0, 6400);
+
         // Stop advertising once a client connects; avoids unnecessary interference.
         NimBLEDevice::getAdvertising()->stop();
     }
 
     void onDisconnect(NimBLEServer* pServer) override {
+        if (s_stopping) {
+            // BLE is being torn down (e.g. prior to esp_restart) — do not
+            // attempt to restart advertising on a partially-deinitialized stack.
+            return;
+        }
         log_i("[ble] Client disconnected — resuming advertising");
         NimBLEDevice::getAdvertising()->start();
     }
@@ -130,11 +159,15 @@ void ble_provision_start() {
     NimBLECharacteristic* pCommit = pSvc->createCharacteristic(UUID_COMMIT, NIMBLE_PROPERTY::WRITE);
     pCommit->setCallbacks(&s_commitCbs);
 
-    // Status notify — indicate + notify so Android can receive the result
+    // Status notify — indicate + notify so Android can receive the result.
+    // Initialise to empty string so that if NimBLE sends an immediate
+    // indication when the CCCD is first written, the payload is known-empty
+    // rather than uninitialised memory.
     s_statusNotifyChar = pSvc->createCharacteristic(
         UUID_STATUS_NOTIFY,
         NIMBLE_PROPERTY::NOTIFY | NIMBLE_PROPERTY::INDICATE
     );
+    s_statusNotifyChar->setValue("");
 
     pSvc->start();
 
@@ -149,6 +182,7 @@ void ble_provision_start() {
 
 void ble_provision_stop() {
     log_i("[ble] Stopping BLE");
+    s_stopping = true;   // suppress onDisconnect advertising restart
     NimBLEDevice::deinit(true);
 }
 
@@ -163,8 +197,11 @@ Credentials ble_provision_get_credentials() {
 void ble_provision_notify_result(const char* result) {
     if (!s_statusNotifyChar) return;
     s_statusNotifyChar->setValue(result);
-    s_statusNotifyChar->notify();
-    log_i("[ble] Notified result: %s", result);
+    // Use indicate() (requires ATT acknowledgement from the client) rather than
+    // notify() (fire-and-forget) so the device knows Android has received the
+    // result before the 1.5 s delay + esp_restart() sequence begins.
+    s_statusNotifyChar->notify(false);   // false = send as indication, not notification
+    log_i("[ble] Indicated result: %s", result);
 }
 
 void ble_provision_clear_commit() {

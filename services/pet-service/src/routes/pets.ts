@@ -20,15 +20,17 @@ petsRouter.get('/', async (req: Request, res: Response) => {
   const { householdId } = getHeaders(req);
   const result = await db.query(
     `SELECT p.*,
+       d.name AS device_name,
        COALESCE(
          SUM(fe.weight_dispensed_g)
            FILTER (WHERE fe.dispensed_at >= CURRENT_DATE AND fe.status = 'confirmed'),
          0
        ) AS today_intake_g
      FROM pets p
+     LEFT JOIN devices d ON d.id = p.device_id
      LEFT JOIN feed_events fe ON fe.pet_id = p.id
      WHERE p.household_id = $1 AND p.deleted_at IS NULL
-     GROUP BY p.id
+     GROUP BY p.id, d.name
      ORDER BY p.name`,
     [householdId],
   );
@@ -68,7 +70,18 @@ petsRouter.post('/', upload.single('photo'), async (req: Request, res: Response)
 petsRouter.get('/:petId', async (req: Request, res: Response) => {
   const { householdId } = getHeaders(req);
   const result = await db.query(
-    'SELECT * FROM pets WHERE id = $1 AND household_id = $2 AND deleted_at IS NULL',
+    `SELECT p.*,
+       d.name AS device_name,
+       COALESCE(
+         SUM(fe.weight_dispensed_g)
+           FILTER (WHERE fe.dispensed_at >= CURRENT_DATE AND fe.status = 'confirmed'),
+         0
+       ) AS today_intake_g
+     FROM pets p
+     LEFT JOIN devices d ON d.id = p.device_id
+     LEFT JOIN feed_events fe ON fe.pet_id = p.id
+     WHERE p.id = $1 AND p.household_id = $2 AND p.deleted_at IS NULL
+     GROUP BY p.id, d.name`,
     [req.params.petId, householdId],
   );
   if (!result.rows[0]) return res.status(404).json({ code: 'NOT_FOUND', message: 'Pet not found' });
@@ -195,7 +208,11 @@ petsRouter.get('/:petId/feeds', async (req: Request, res: Response) => {
 
   params.push(page_size, offset);
   const result = await db.query(
-    `SELECT * FROM feed_events WHERE ${where} ORDER BY dispensed_at DESC LIMIT $${p} OFFSET $${p + 1}`,
+    `SELECT fe.*, u.name AS triggered_by_name
+     FROM feed_events fe
+     LEFT JOIN users u ON u.id = fe.triggered_by
+     WHERE ${where}
+     ORDER BY fe.dispensed_at DESC LIMIT $${p} OFFSET $${p + 1}`,
     params,
   );
 
@@ -223,9 +240,9 @@ petsRouter.get('/:petId/stats', async (req: Request, res: Response) => {
 
   const result = await db.query(
     `SELECT
-       DATE(dispensed_at) AS date,
-       COALESCE(SUM(weight_dispensed_g), 0) AS total_g,
-       COUNT(*) AS feed_count
+       DATE(dispensed_at)::text AS date,
+       COALESCE(SUM(weight_dispensed_g), 0)::int AS total_g,
+       COUNT(*)::int AS feed_count
      FROM feed_events
      WHERE pet_id = $1 AND status = 'confirmed'
        AND dispensed_at >= $2 AND dispensed_at <= $3

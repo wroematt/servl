@@ -3,9 +3,12 @@
 
 // Attempt to connect to the given WiFi network.
 // Blocks until connected or timeout_ms elapses.
+// updateCb (optional) is called every 200 ms during the wait — pass
+// led_status_update so the LED keeps blinking during the blocking connect.
 // Returns true on success.
 bool wifi_connect(const char* ssid, const char* pass,
-                  uint32_t timeout_ms = 15000);
+                  uint32_t timeout_ms = 15000,
+                  void (*updateCb)() = nullptr);
 
 // Returns true if currently connected.
 bool wifi_is_connected();

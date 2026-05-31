@@ -1,14 +1,18 @@
-#include "led_status.h"
+﻿#include "led_status.h"
 #include "config.h"
 
-static LedState  s_state      = LedState::PROVISIONING;
+// Initialise to OFF so the very first led_status_set() call always enters the
+// if-branch and resets the timer correctly (if we initialised to PROVISIONING,
+// calling led_status_set(PROVISIONING) in setup() would be a no-op and the
+// blink timer would never be initialised, leaving the LED stuck on permanently).
+static LedState  s_state      = LedState::OFF;
 static uint32_t  s_lastChange = 0;
 static bool      s_ledOn      = false;
 
 void led_status_set(LedState state) {
     if (state != s_state) {
         s_state      = state;
-        s_lastChange = 0;   // force immediate evaluation on next update()
+        s_lastChange = 0;   // force immediate evaluation on next led_status_update()
         s_ledOn      = false;
         digitalWrite(PIN_LED, LOW);
     }

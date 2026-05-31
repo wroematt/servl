@@ -1,6 +1,7 @@
 package com.servl.app.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -14,24 +15,26 @@ fun AppNavHost(authViewModel: AuthViewModel = hiltViewModel()) {
     val authState by authViewModel.authState.collectAsState()
     val navController = rememberNavController()
 
-    // Determine start destination based on auth state
-    val startDestination = when (authState) {
-        is AuthState.Loading        -> Screen.Login.route   // Login shows a loader while checking
-        is AuthState.Unauthenticated -> Screen.Login.route
-        is AuthState.Authenticated  -> Screen.Home.route
+    // NavHost requires a fixed startDestination — changing it after composition is not supported
+    // and causes the wrong tab to be shown.  Always start at Login; navigate to Home via
+    // LaunchedEffect once the auth check resolves to Authenticated.
+    LaunchedEffect(authState) {
+        if (authState is AuthState.Authenticated) {
+            navController.navigate(Screen.Home.route) {
+                popUpTo(Screen.Login.route) { inclusive = true }
+            }
+        }
     }
 
-    NavHost(navController = navController, startDestination = startDestination) {
+    NavHost(navController = navController, startDestination = Screen.Login.route) {
 
         // ── Auth screens (no bottom nav) ──────────────────────────────────────
 
         composable(Screen.Login.route) {
             LoginScreen(
-                onLoginSuccess = {
-                    navController.navigate(Screen.Home.route) {
-                        popUpTo(Screen.Login.route) { inclusive = true }
-                    }
-                },
+                // Navigation is handled by LaunchedEffect above (authState → Authenticated).
+                // This callback is intentionally a no-op to avoid a duplicate navigate call.
+                onLoginSuccess = {},
                 onNavigateToRegister = { navController.navigate(Screen.Register.route) },
                 onNavigateToForgotPassword = { navController.navigate(Screen.ForgotPassword.route) },
                 viewModel = authViewModel,
@@ -40,11 +43,8 @@ fun AppNavHost(authViewModel: AuthViewModel = hiltViewModel()) {
 
         composable(Screen.Register.route) {
             RegisterScreen(
-                onRegisterSuccess = {
-                    navController.navigate(Screen.Home.route) {
-                        popUpTo(Screen.Login.route) { inclusive = true }
-                    }
-                },
+                // Same as above — LaunchedEffect drives the transition to Home.
+                onRegisterSuccess = {},
                 onNavigateToLogin = { navController.popBackStack() },
                 viewModel = authViewModel,
             )

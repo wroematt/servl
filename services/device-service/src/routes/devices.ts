@@ -4,6 +4,7 @@ import { z } from 'zod';
 import crypto from 'crypto';
 import { db } from '../lib/db';
 import { config } from '../config';
+import { publishCommand } from '../lib/mqtt';
 
 export const devicesRouter = Router();
 
@@ -36,6 +37,10 @@ devicesRouter.get('/', async (req: Request, res: Response) => {
 const createDeviceSchema = z.object({
   name: z.string().min(1).max(100),
   serial_number: z.string().min(1).max(100),
+  // IANA timezone string supplied by the Android app (e.g. "Europe/London").
+  // Used to set the household timezone so the schedule worker fires at the
+  // correct local time rather than UTC.
+  timezone: z.string().max(64).optional(),
 });
 
 devicesRouter.post('/', async (req: Request, res: Response) => {
@@ -48,6 +53,21 @@ devicesRouter.post('/', async (req: Request, res: Response) => {
     return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'Invalid request', details: body.error.flatten() });
   }
 
+  // Check if this serial number already exists (e.g. a previous failed provisioning attempt).
+  const existing = await db.query(
+    'SELECT id, household_id FROM devices WHERE serial_number = $1',
+    [body.data.serial_number],
+  );
+  if (existing.rows[0]) {
+    if (existing.rows[0].household_id !== householdId) {
+      // Serial belongs to a different household — refuse.
+      return res.status(409).json({ code: 'CONFLICT', message: 'Device already registered to another household' });
+    }
+    // Same household — stale record from a previous failed provisioning attempt. Remove it so
+    // we can re-provision with a fresh UUID and MQTT client ID.
+    await db.query('DELETE FROM devices WHERE id = $1', [existing.rows[0].id]);
+  }
+
   const deviceUuid = crypto.randomUUID();
   const mqttClientId = `device_${deviceUuid}`;
   // cert_fingerprint is a placeholder — real cert is issued out-of-band during physical provisioning
@@ -58,6 +78,19 @@ devicesRouter.post('/', async (req: Request, res: Response) => {
      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
     [deviceUuid, householdId, body.data.name, body.data.serial_number, mqttClientId, certFingerprint],
   );
+
+  // Persist the household timezone if the app supplied one.
+  // This is used by the schedule worker so feeds fire at the correct local time.
+  // We only update when a timezone is provided — the default is already 'UTC'.
+  if (body.data.timezone) {
+    try {
+      // Validate that the string is a real IANA zone before storing it.
+      Intl.DateTimeFormat(undefined, { timeZone: body.data.timezone });
+      await db.query('UPDATE households SET timezone = $1 WHERE id = $2', [body.data.timezone, householdId]);
+    } catch {
+      // Invalid timezone string — ignore silently, household keeps its current value.
+    }
+  }
 
   // Return MQTT credentials alongside the device record so the Android app
   // can provision the ESP32 over BLE without any user input.
@@ -121,11 +154,30 @@ devicesRouter.delete('/:deviceId', async (req: Request, res: Response) => {
   if (role !== 'owner') {
     return res.status(403).json({ code: 'FORBIDDEN', message: 'Owner role required' });
   }
-  const result = await db.query(
-    'DELETE FROM devices WHERE id = $1 AND household_id = $2 RETURNING id',
+
+  // Fetch before deleting so we can check status and derive the device UUID.
+  const device = await db.query(
+    'SELECT id, status, mqtt_client_id FROM devices WHERE id = $1 AND household_id = $2',
     [req.params.deviceId, householdId],
   );
-  if (!result.rows[0]) return res.status(404).json({ code: 'NOT_FOUND', message: 'Device not found' });
+  if (!device.rows[0]) return res.status(404).json({ code: 'NOT_FOUND', message: 'Device not found' });
+
+  // If the device is currently online, send a factory_reset command so it wipes its
+  // NVS credentials and re-enters BLE provisioning mode immediately.
+  // The device UUID is the part after "device_" in the mqtt_client_id.
+  if (device.rows[0].status === 'online') {
+    const mqttClientId: string = device.rows[0].mqtt_client_id;
+    const deviceUuid = mqttClientId.startsWith('device_') ? mqttClientId.slice(7) : mqttClientId;
+    try {
+      publishCommand(deviceUuid, { command_id: 'factory_reset', action: 'factory_reset', weight_g: 0 });
+    } catch (err) {
+      // Non-fatal — the record is still deleted. The device will stay provisioned
+      // until manually reset, but the backend will no longer accept its telemetry.
+      console.warn('Could not send factory_reset command:', err);
+    }
+  }
+
+  await db.query('DELETE FROM devices WHERE id = $1', [req.params.deviceId]);
   return res.status(204).send();
 });
 

@@ -12,10 +12,10 @@ import androidx.compose.ui.semantics.contentType
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
+import com.servl.app.ui.components.PasswordTextField
 import com.servl.app.ui.theme.TextSecondary
 
 @OptIn(ExperimentalComposeUiApi::class)
@@ -65,16 +65,10 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        OutlinedTextField(
+        PasswordTextField(
             value = password,
             onValueChange = { password = it; viewModel.clearError() },
-            label = { Text("Password") },
-            singleLine = true,
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Password,
-                imeAction = ImeAction.Done,
-            ),
+            label = "Password",
             modifier = Modifier
                 .fillMaxWidth()
                 .semantics { contentType = ContentType.Password },

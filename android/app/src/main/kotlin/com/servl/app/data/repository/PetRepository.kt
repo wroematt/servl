@@ -27,14 +27,16 @@ class PetRepository @Inject constructor(
         snackWeightG: Int,
         dailyTargetG: Int,
         photoUri: Uri?,
+        deviceId: String? = null,
     ): PetDto {
-        val parts = mapOf(
+        val parts = mutableMapOf(
             "name"           to name.toRequestBody(),
             "type"           to type.toRequestBody(),
             "meal_weight_g"  to mealWeightG.toString().toRequestBody(),
             "snack_weight_g" to snackWeightG.toString().toRequestBody(),
             "daily_target_g" to dailyTargetG.toString().toRequestBody(),
         )
+        if (deviceId != null) parts["device_id"] = deviceId.toRequestBody()
         val photoPart = photoUri?.toPhotoPart(context)
         return api.createPet(parts, photoPart)
     }
@@ -47,24 +49,29 @@ class PetRepository @Inject constructor(
         snackWeightG: Int,
         dailyTargetG: Int,
         photoUri: Uri?,
+        deviceId: String? = null,
     ): PetDto {
         return if (photoUri != null) {
-            val parts = mapOf(
+            val parts = mutableMapOf(
                 "name"           to name.toRequestBody(),
                 "type"           to type.toRequestBody(),
                 "meal_weight_g"  to mealWeightG.toString().toRequestBody(),
                 "snack_weight_g" to snackWeightG.toString().toRequestBody(),
                 "daily_target_g" to dailyTargetG.toString().toRequestBody(),
             )
+            if (deviceId != null) parts["device_id"] = deviceId.toRequestBody()
             api.updatePetMultipart(petId, parts, photoUri.toPhotoPart(context))
         } else {
-            api.updatePet(petId, mapOf(
+            val body = mutableMapOf<String, Any?>(
                 "name"           to name,
                 "type"           to type,
                 "meal_weight_g"  to mealWeightG,
                 "snack_weight_g" to snackWeightG,
                 "daily_target_g" to dailyTargetG,
-            ))
+            )
+            // Pass null explicitly to unassign, or omit if unchanged (pass same value)
+            body["device_id"] = deviceId
+            api.updatePet(petId, body)
         }
     }
 

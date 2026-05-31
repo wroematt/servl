@@ -6,7 +6,7 @@ static char s_ssid[64]  = {};
 static char s_pass[128] = {};
 static uint32_t s_reconnectAt = 0;
 
-bool wifi_connect(const char* ssid, const char* pass, uint32_t timeout_ms) {
+bool wifi_connect(const char* ssid, const char* pass, uint32_t timeout_ms, void (*updateCb)()) {
     strlcpy(s_ssid, ssid, sizeof(s_ssid));
     strlcpy(s_pass, pass, sizeof(s_pass));
 
@@ -17,6 +17,7 @@ bool wifi_connect(const char* ssid, const char* pass, uint32_t timeout_ms) {
     uint32_t deadline = millis() + timeout_ms;
     while (WiFi.status() != WL_CONNECTED && millis() < deadline) {
         delay(200);
+        if (updateCb) updateCb();   // keep LED blinking while waiting
     }
 
     if (WiFi.status() == WL_CONNECTED) {

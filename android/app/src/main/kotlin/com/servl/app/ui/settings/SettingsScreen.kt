@@ -7,6 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
@@ -14,8 +15,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.servl.app.BuildConfig
 import com.servl.app.ui.auth.AuthState
 import com.servl.app.ui.auth.AuthViewModel
+import com.servl.app.ui.theme.TextSecondary
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -93,6 +96,15 @@ fun SettingsScreen(
             }
 
             item { Spacer(Modifier.height(24.dp)) }
+
+            item {
+                ListItem(
+                    headlineContent = { Text("App version") },
+                    supportingContent = { Text("v${BuildConfig.VERSION_NAME}", color = TextSecondary) },
+                    leadingContent = { Icon(Icons.Default.Info, null, tint = TextSecondary) },
+                )
+                HorizontalDivider()
+            }
 
             item {
                 ListItem(

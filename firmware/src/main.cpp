@@ -106,7 +106,7 @@ static void handle_provisioning_ble() {
     s_creds = ble_provision_get_credentials();
 
     // Test WiFi (BLE + WiFi coexist on ESP32 with NimBLE).
-    bool wifiOk = wifi_connect(s_creds.ssid, s_creds.wifi_pass, WIFI_CONNECT_TIMEOUT_MS);
+    bool wifiOk = wifi_connect(s_creds.ssid, s_creds.wifi_pass, WIFI_CONNECT_TIMEOUT_MS, led_status_update);
     if (!wifiOk) {
         log_e("[main] PROVISIONING: WiFi test failed");
         ble_provision_notify_result("ERROR:wifi");
@@ -124,11 +124,15 @@ static void handle_provisioning_ble() {
 
     // Both OK — persist credentials, notify the app, reboot into operational mode.
     storage_save(s_creds);
+
+    // Best-effort BLE indication.  The ESP32 shares its 2.4 GHz radio between
+    // WiFi and BLE; while WiFi is connected it starves BLE TX, so this
+    // indication may or may not reach the Android app.  The app falls back to
+    // polling the backend for confirmation, so a lost indication is not fatal.
     ble_provision_notify_result("OK");
 
-    log_i("[main] PROVISIONING: success — rebooting in 1 s");
-    delay(1000);   // give the notification time to reach the app
-    ble_provision_stop();
+    log_i("[main] PROVISIONING: success — rebooting in 1.5 s");
+    delay(1500);
     esp_restart();
 }
 
@@ -137,13 +141,18 @@ static void handle_provisioning_ble() {
 // Attempt WiFi; on success advance to MQTT_CONNECTING.
 // ─────────────────────────────────────────────────────────────────────────────
 static void handle_wifi_connecting() {
-    if (wifi_connect(s_creds.ssid, s_creds.wifi_pass, WIFI_CONNECT_TIMEOUT_MS)) {
+    if (wifi_connect(s_creds.ssid, s_creds.wifi_pass, WIFI_CONNECT_TIMEOUT_MS, led_status_update)) {
         log_i("[main] WiFi connected — moving to MQTT_CONNECTING");
         s_state = AppState::MQTT_CONNECTING;
         led_status_set(LedState::MQTT_CONNECTING);
     } else {
         log_w("[main] WiFi connect failed — will retry");
-        delay(5000);
+        // Non-blocking 5 s back-off: keep updating the LED every 200 ms.
+        uint32_t retryAt = millis() + 5000;
+        while (millis() < retryAt) {
+            led_status_update();
+            delay(20);
+        }
     }
 }
 
@@ -169,7 +178,12 @@ static void handle_mqtt_connecting() {
             s_state = AppState::WIFI_CONNECTING;
             led_status_set(LedState::WIFI_CONNECTING);
         }
-        delay(5000);
+        // Non-blocking 5 s back-off: keep updating the LED every 20 ms.
+        uint32_t retryAt = millis() + 5000;
+        while (millis() < retryAt) {
+            led_status_update();
+            delay(20);
+        }
     }
 }
 
@@ -200,6 +214,19 @@ static void handle_operational() {
     if (millis() >= s_heartbeatAt) {
         mqtt_publish_status(nullptr, -1, dispenser_get_hopper_pct(), "ok");
         s_heartbeatAt = millis() + HEARTBEAT_INTERVAL_MS;
+    }
+
+    // Check for a remote factory reset command (sent by the backend when the device is deleted).
+    if (g_factoryResetPending) {
+        log_w("[main] Remote factory reset — erasing credentials and rebooting");
+        g_factoryResetPending = false;
+        // Flash LED 5x to give visible feedback (mirrors physical button reset).
+        for (int i = 0; i < 5; i++) {
+            digitalWrite(PIN_LED, HIGH); delay(100);
+            digitalWrite(PIN_LED, LOW);  delay(100);
+        }
+        storage_clear();
+        esp_restart();
     }
 
     // Check for a pending dispense command (set by the MQTT message callback).

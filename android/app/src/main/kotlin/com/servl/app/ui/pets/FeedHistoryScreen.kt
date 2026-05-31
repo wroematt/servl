@@ -47,9 +47,17 @@ fun FeedHistoryScreen(
             contentPadding = PaddingValues(bottom = 16.dp),
         ) {
             items(feedHistory) { event ->
-                val time = runCatching { formatter.format(Instant.parse(event.created_at)) }.getOrDefault("--")
+                val time = runCatching { formatter.format(Instant.parse(event.dispensed_at)) }.getOrDefault("--")
                 ListItem(
-                    headlineContent = { Text(event.trigger_type.replaceFirstChar { it.uppercase() }) },
+                    headlineContent = {
+                        val label = buildString {
+                            append(event.trigger_type.replaceFirstChar { it.uppercase() })
+                            if (event.trigger_type == "manual" && event.triggered_by_name != null) {
+                                append(" · ${event.triggered_by_name}")
+                            }
+                        }
+                        Text(label)
+                    },
                     supportingContent = {
                         Text(
                             buildString {

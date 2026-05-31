@@ -35,6 +35,9 @@ fun DeviceDetailScreen(
     val authState by authViewModel.authState.collectAsState()
     val isOwner = (authState as? AuthState.Authenticated)?.user?.role == "owner"
 
+    val error by viewModel.error.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
     var showRenameDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
@@ -42,6 +45,14 @@ fun DeviceDetailScreen(
     val formatter = remember { DateTimeFormatter.ofPattern("dd MMM HH:mm").withZone(ZoneId.systemDefault()) }
 
     LaunchedEffect(deviceId) { viewModel.startPollingDevice(deviceId) }
+
+    // Show errors (e.g. delete failed) as a snackbar.
+    LaunchedEffect(error) {
+        if (!error.isNullOrBlank()) {
+            snackbarHostState.showSnackbar(error!!)
+            viewModel.clearError()
+        }
+    }
 
     if (showRenameDialog) {
         AlertDialog(
@@ -63,7 +74,10 @@ fun DeviceDetailScreen(
             title = { Text("Remove device?") },
             text = { Text("This will unlink the device. It will stop receiving commands.") },
             confirmButton = {
-                TextButton(onClick = { viewModel.deleteDevice(deviceId, onNavigateBack) }) {
+                TextButton(onClick = {
+                    showDeleteDialog = false
+                    viewModel.deleteDevice(deviceId, onNavigateBack)
+                }) {
                     Text("Remove", color = MaterialTheme.colorScheme.error)
                 }
             },
@@ -72,6 +86,7 @@ fun DeviceDetailScreen(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(device?.name ?: "Device") },
