@@ -141,8 +141,12 @@ authRouter.post('/refresh', async (req: Request, res: Response) => {
     await db.query('DELETE FROM refresh_tokens WHERE id = $1', [row.id]);
     return res.status(401).json({ code: 'TOKEN_EXPIRED', message: 'Refresh token expired' });
   }
-  const accessToken = issueAccessToken(row.user_id, row.household_id, row.role);
-  return res.json({ accessToken });
+  // Token rotation: delete the used token and issue a new one.
+  // This prevents replay attacks — a stolen refresh token can only be used once.
+  await db.query('DELETE FROM refresh_tokens WHERE id = $1', [row.id]);
+  const accessToken  = issueAccessToken(row.user_id, row.household_id, row.role);
+  const refreshToken = await issueRefreshToken(row.user_id);
+  return res.json({ accessToken, refreshToken });
 });
 
 // ── POST /auth/logout ──────────────────────────

@@ -1,4 +1,5 @@
 #pragma once
+#include <Arduino.h>    // uint8_t, uint32_t, etc. from the ESP32 toolchain
 
 // ─── Hardware pins ───────────────────────────────────────────────────────────
 // GPIO2  = built-in LED on most ESP32-WROOM / ESP32 DevKit boards (active HIGH)

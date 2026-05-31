@@ -81,7 +81,7 @@ class AuthInterceptor(
             val json = response.body?.string() ?: return null
             val parsed = gson.fromJson(json, RefreshResponse::class.java)
             tokenDataStore.accessToken = parsed.accessToken
-            tokenDataStore.saveRefreshToken(parsed.refreshToken)
+            parsed.refreshToken?.let { tokenDataStore.saveRefreshToken(it) }
             parsed.accessToken
         } catch (e: Exception) {
             null

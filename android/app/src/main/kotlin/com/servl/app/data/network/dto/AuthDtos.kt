@@ -15,5 +15,5 @@ data class AuthResponse(
 
 data class RefreshResponse(
     val accessToken: String,
-    val refreshToken: String,
+    val refreshToken: String?,   // nullable — older backends don't rotate refresh tokens
 )

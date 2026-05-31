@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <WiFi.h>       // WiFi.disconnect() in handle_provisioning_ble()
 #include "config.h"
 #include "storage.h"
 #include "ble_provision.h"

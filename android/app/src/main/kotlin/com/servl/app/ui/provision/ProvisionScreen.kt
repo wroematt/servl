@@ -63,7 +63,7 @@ fun ProvisionScreen(
                     onDeviceSelected = { viewModel.selectDevice(it) },
                 )
                 ProvisionStep.CREDENTIALS -> CredentialsStep(
-                    onConnect = { name, serial, ssid, pass -> viewModel.provision(name, serial, ssid, pass) },
+                    onConnect = { name, ssid, pass, mqttPass -> viewModel.provision(name, ssid, pass, mqttPass) },
                     onBack = { viewModel.reset() },
                 )
                 ProvisionStep.PROVISIONING -> ProgressStep(message = statusMessage)
@@ -132,13 +132,13 @@ private fun ScanStep(
 
 @Composable
 private fun CredentialsStep(
-    onConnect: (deviceName: String, serialNumber: String, ssid: String, wifiPassword: String) -> Unit,
+    onConnect: (deviceName: String, ssid: String, wifiPassword: String, mqttPassword: String) -> Unit,
     onBack: () -> Unit,
 ) {
     var deviceName by remember { mutableStateOf("") }
-    var serialNumber by remember { mutableStateOf("") }
     var ssid by remember { mutableStateOf("") }
     var wifiPassword by remember { mutableStateOf("") }
+    var mqttPassword by remember { mutableStateOf("") }
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -147,7 +147,6 @@ private fun CredentialsStep(
         Text("Device details", style = MaterialTheme.typography.titleSmall)
 
         OutlinedTextField(value = deviceName, onValueChange = { deviceName = it }, label = { Text("Device name") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-        OutlinedTextField(value = serialNumber, onValueChange = { serialNumber = it }, label = { Text("Serial number") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
 
         HorizontalDivider()
         Text("WiFi network", style = MaterialTheme.typography.titleSmall)
@@ -163,12 +162,25 @@ private fun CredentialsStep(
             singleLine = true,
         )
 
+        HorizontalDivider()
+        Text("MQTT broker", style = MaterialTheme.typography.titleSmall)
+
+        OutlinedTextField(
+            value = mqttPassword,
+            onValueChange = { mqttPassword = it },
+            label = { Text("Broker password") },
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+        )
+
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f)) { Text("Back") }
             Button(
-                onClick = { onConnect(deviceName, serialNumber, ssid, wifiPassword) },
+                onClick = { onConnect(deviceName, ssid, wifiPassword, mqttPassword) },
                 modifier = Modifier.weight(1f),
-                enabled = deviceName.isNotBlank() && ssid.isNotBlank(),
+                enabled = deviceName.isNotBlank() && ssid.isNotBlank() && mqttPassword.isNotBlank(),
             ) { Text("Connect") }
         }
     }

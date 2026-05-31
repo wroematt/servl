@@ -61,20 +61,28 @@ class ProvisionViewModel @Inject constructor(
      * 1. Registers device in the backend (POST /devices) to get MQTT credentials.
      * 2. Runs the BLE GATT write sequence.
      * 3. Polls GET /devices/{id} every 3s until status == "online" (60s timeout).
+     *
+     * The serial number is derived automatically from the device's BLE MAC address
+     * (colons stripped, e.g. "AA:BB:CC:DD:EE:FF" → "AABBCCDDEEFF"), so the user
+     * never has to type it.
      */
-    fun provision(deviceName: String, serialNumber: String, ssid: String, wifiPassword: String) {
+    fun provision(deviceName: String, ssid: String, wifiPassword: String, mqttPassword: String) {
         _step.value = ProvisionStep.PROVISIONING
         viewModelScope.launch {
             try {
+                val address = _selectedAddress.value ?: throw Exception("No device selected")
+
+                // Derive the serial number from the BLE MAC address (unique, stable, no user input).
+                val serialNumber = address.replace(":", "")
+
                 // Step 1: register in backend
                 _statusMessage.value = "Registering device…"
                 val device = deviceRepository.provisionDevice(deviceName, serialNumber)
 
                 // Step 2: BLE provisioning
                 _statusMessage.value = "Connecting to device…"
-                val address = _selectedAddress.value ?: throw Exception("No device selected")
 
-                // Extract MQTT broker host from BASE_URL (strip http:// prefix and port)
+                // Extract MQTT broker host from BASE_URL (strip scheme and port).
                 val mqttBroker = BuildConfig.BASE_URL
                     .removePrefix("http://").removePrefix("https://")
                     .substringBefore(":")   // remove port if present
@@ -86,8 +94,8 @@ class ProvisionViewModel @Inject constructor(
                     mqttBroker    = mqttBroker,
                     mqttPort      = 1883,
                     mqttClientId  = device.mqtt_client_id,
-                    mqttUser      = "internal_service", // TODO: pass via secure channel
-                    mqttPass      = "",
+                    mqttUser      = "internal_service",
+                    mqttPass      = mqttPassword,
                 )
 
                 if (bleResult.isFailure) throw bleResult.exceptionOrNull() ?: Exception("BLE provisioning failed")
