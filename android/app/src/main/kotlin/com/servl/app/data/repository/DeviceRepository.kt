@@ -22,4 +22,8 @@ class DeviceRepository @Inject constructor(private val api: ApiService) {
 
     suspend fun getDeviceEvents(deviceId: String, page: Int = 1, pageSize: Int = 20) =
         api.getDeviceEvents(deviceId, page, pageSize)
+
+    suspend fun getLatestFirmware() = api.getLatestFirmware()
+
+    suspend fun triggerOta(deviceId: String) = api.triggerOta(deviceId)
 }

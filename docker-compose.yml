@@ -132,6 +132,9 @@ services:
       - MQTT_INTERNAL_USER=${MQTT_INTERNAL_USER}
       - MQTT_INTERNAL_PASS=${MQTT_INTERNAL_PASS}
       - NOTIFICATION_SERVICE_URL=http://notification-service:3004
+      # LAN URL that ESP32 devices can reach for OTA firmware downloads.
+      # Set this to http://<raspberry-pi-lan-ip>:3000 in your .env file.
+      - OTA_BASE_URL=${OTA_BASE_URL:-http://localhost:3000}
     networks:
       - internal
     depends_on:

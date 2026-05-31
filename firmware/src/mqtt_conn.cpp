@@ -1,6 +1,7 @@
-// IMPORTANT: MQTT_MAX_PACKET_SIZE must be a plain #define before PubSubClient.h
-// is first included — constexpr / enum values do not satisfy its #if checks.
-#define MQTT_MAX_PACKET_SIZE 512
+// NOTE: MQTT_MAX_PACKET_SIZE is set to 1024 via build_flags in platformio.ini
+// (-DMQTT_MAX_PACKET_SIZE=1024) so the define applies to PubSubClient.cpp's
+// compilation unit as well as this one.  We also call setBufferSize() at
+// runtime (see mqtt_connect) as a belt-and-suspenders guarantee.
 
 #include "config.h"
 #include "mqtt_conn.h"
@@ -11,7 +12,9 @@
 // ─── Global command state (declared in mqtt_conn.h) ──────────────────────────
 volatile bool  g_commandPending      = false;
 volatile bool  g_factoryResetPending = false;
+volatile bool  g_otaPending          = false;
 PendingCommand g_pendingCommand      = {};
+OtaCommand     g_otaCommand          = {};
 
 // ─── Module-level state ───────────────────────────────────────────────────────
 static WiFiClient    s_wifiClient;
@@ -47,6 +50,23 @@ static void onMessage(const char* topic, uint8_t* payload, unsigned int length) 
     if (strcmp(action, "factory_reset") == 0) {
         log_w("[mqtt] Factory reset command received from broker");
         g_factoryResetPending = true;
+        return;
+    }
+
+    // OTA firmware update command.
+    if (strcmp(action, "ota") == 0) {
+        const char* url     = doc["url"];
+        const char* version = doc["version"];
+        const char* cmdId   = doc["command_id"];
+        if (!url || !version || !cmdId) {
+            log_e("[mqtt] Invalid OTA command — missing url, version, or command_id");
+            return;
+        }
+        strlcpy(g_otaCommand.command_id, cmdId,   sizeof(g_otaCommand.command_id));
+        strlcpy(g_otaCommand.url,        url,     sizeof(g_otaCommand.url));
+        strlcpy(g_otaCommand.version,    version, sizeof(g_otaCommand.version));
+        g_otaPending = true;
+        log_i("[mqtt] OTA command queued: v%s from %s", version, url);
         return;
     }
 
@@ -92,6 +112,7 @@ bool mqtt_connect(const Credentials& creds) {
     log_i("[mqtt] Connecting to %s:%d as %s", creds.mqtt_broker, creds.mqtt_port, creds.mqtt_client_id);
 
     s_mqtt.setServer(creds.mqtt_broker, creds.mqtt_port);
+    s_mqtt.setBufferSize(MQTT_MAX_PACKET);  // runtime guarantee; build flag sets compile-time default
     s_mqtt.setCallback(onMessage);
     s_mqtt.setKeepAlive(60);
 

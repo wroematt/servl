@@ -1,5 +1,7 @@
 #include <Arduino.h>
 #include <WiFi.h>       // WiFi.disconnect() in handle_provisioning_ble()
+#include <HTTPClient.h>
+#include <Update.h>
 #include "config.h"
 #include "storage.h"
 #include "ble_provision.h"
@@ -15,6 +17,7 @@ enum class AppState {
     MQTT_CONNECTING,    // WiFi up — connecting to MQTT broker
     OPERATIONAL,        // MQTT connected — listening for commands
     DISPENSING,         // Executing a dispense command
+    UPDATING,           // Downloading + flashing OTA firmware update
 };
 
 static AppState      s_state       = AppState::PROVISIONING_BLE;
@@ -28,6 +31,7 @@ static void handle_wifi_connecting();
 static void handle_mqtt_connecting();
 static void handle_operational();
 static void handle_dispensing();
+static void handle_updating();
 static void check_factory_reset();
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -67,6 +71,7 @@ void loop() {
         case AppState::MQTT_CONNECTING:  handle_mqtt_connecting();  break;
         case AppState::OPERATIONAL:      handle_operational();      break;
         case AppState::DISPENSING:       handle_dispensing();       break;
+        case AppState::UPDATING:         handle_updating();         break;
     }
 }
 
@@ -229,6 +234,14 @@ static void handle_operational() {
         esp_restart();
     }
 
+    // Check for a pending OTA update command.
+    if (g_otaPending) {
+        log_i("[main] OTA command received — moving to UPDATING");
+        s_state = AppState::UPDATING;
+        led_status_set(LedState::WIFI_CONNECTING);  // fast blink during update
+        return;
+    }
+
     // Check for a pending dispense command (set by the MQTT message callback).
     if (g_commandPending) {
         log_i("[main] Dispense command received — moving to DISPENSING");
@@ -265,4 +278,73 @@ static void handle_dispensing() {
     log_i("[main] Dispense done — returning to OPERATIONAL");
     s_state = AppState::OPERATIONAL;
     led_status_set(LedState::OPERATIONAL);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// State: UPDATING
+// Download firmware binary via HTTP and flash using the Arduino Update library.
+// On success: publishes ota_ok status then reboots into the new firmware.
+// On failure: logs error, publishes ota_failed, returns to OPERATIONAL.
+// ─────────────────────────────────────────────────────────────────────────────
+static void handle_updating() {
+    OtaCommand cmd = g_otaCommand;
+    g_otaPending = false;
+
+    log_i("[ota] Starting OTA update to v%s", cmd.version);
+    log_i("[ota] Download URL: %s", cmd.url);
+
+    HTTPClient http;
+    http.begin(cmd.url);
+    http.setTimeout(30000);  // 30 s download timeout
+    int httpCode = http.GET();
+
+    if (httpCode != HTTP_CODE_OK) {
+        log_e("[ota] HTTP GET failed: %d", httpCode);
+        http.end();
+        mqtt_publish_status(cmd.command_id, -1, dispenser_get_hopper_pct(), "ota_failed");
+        s_state = AppState::OPERATIONAL;
+        led_status_set(LedState::OPERATIONAL);
+        return;
+    }
+
+    int contentLen = http.getSize();
+    log_i("[ota] Content-Length: %d bytes", contentLen);
+
+    bool canBegin = Update.begin(contentLen > 0 ? contentLen : UPDATE_SIZE_UNKNOWN);
+    if (!canBegin) {
+        log_e("[ota] Update.begin() failed — not enough flash space?");
+        http.end();
+        mqtt_publish_status(cmd.command_id, -1, dispenser_get_hopper_pct(), "ota_failed");
+        s_state = AppState::OPERATIONAL;
+        led_status_set(LedState::OPERATIONAL);
+        return;
+    }
+
+    // Stream the download into the flash partition.
+    WiFiClient* stream = http.getStreamPtr();
+    size_t written = Update.writeStream(*stream);
+    http.end();
+
+    log_i("[ota] Written %d bytes", written);
+
+    if (!Update.end()) {
+        log_e("[ota] Update.end() failed: %s", Update.errorString());
+        mqtt_publish_status(cmd.command_id, -1, dispenser_get_hopper_pct(), "ota_failed");
+        s_state = AppState::OPERATIONAL;
+        led_status_set(LedState::OPERATIONAL);
+        return;
+    }
+
+    if (!Update.isFinished()) {
+        log_e("[ota] Update not finished — incomplete download");
+        mqtt_publish_status(cmd.command_id, -1, dispenser_get_hopper_pct(), "ota_failed");
+        s_state = AppState::OPERATIONAL;
+        led_status_set(LedState::OPERATIONAL);
+        return;
+    }
+
+    log_i("[ota] Flash successful — publishing ota_ok and rebooting in 1 s");
+    mqtt_publish_status(cmd.command_id, -1, dispenser_get_hopper_pct(), "ota_ok");
+    delay(1000);  // give MQTT time to deliver the status before reset
+    esp_restart();
 }

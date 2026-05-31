@@ -9,10 +9,20 @@ struct PendingCommand {
     int  weight_g;
 };
 
+// ─── Pending OTA command ──────────────────────────────────────────────────────
+// Populated by the MQTT message callback when an OTA update command arrives.
+struct OtaCommand {
+    char command_id[64];
+    char url[512];       // full HTTP URL including signed token query parameter
+    char version[16];    // semver string, e.g. "1.3.0"
+};
+
 // Set by the message callback; cleared by main.cpp after the command is handled.
 extern volatile bool  g_commandPending;
 extern volatile bool  g_factoryResetPending;   // set when broker sends action=factory_reset
+extern volatile bool  g_otaPending;            // set when broker sends action=ota
 extern PendingCommand g_pendingCommand;
+extern OtaCommand     g_otaCommand;
 
 // ─── API ─────────────────────────────────────────────────────────────────────
 

@@ -7,6 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,21 +33,32 @@ fun DeviceDetailScreen(
 ) {
     val device by viewModel.selectedDevice.collectAsState()
     val events by viewModel.events.collectAsState()
+    val latestFirmware by viewModel.latestFirmware.collectAsState()
+    val otaInProgress by viewModel.otaInProgress.collectAsState()
     val authState by authViewModel.authState.collectAsState()
     val isOwner = (authState as? AuthState.Authenticated)?.user?.role == "owner"
 
     val error by viewModel.error.collectAsState()
+    val success by viewModel.success.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
     var showRenameDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showOtaDialog by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
 
     val formatter = remember { DateTimeFormatter.ofPattern("dd MMM HH:mm").withZone(ZoneId.systemDefault()) }
 
-    LaunchedEffect(deviceId) { viewModel.startPollingDevice(deviceId) }
+    // Determine if an update is available
+    val updateAvailable = latestFirmware != null &&
+        device?.firmware_version != null &&
+        latestFirmware!!.version != device!!.firmware_version
 
-    // Show errors (e.g. delete failed) as a snackbar.
+    LaunchedEffect(deviceId) {
+        viewModel.startPollingDevice(deviceId)
+        viewModel.loadLatestFirmware()
+    }
+
     LaunchedEffect(error) {
         if (!error.isNullOrBlank()) {
             snackbarHostState.showSnackbar(error!!)
@@ -54,6 +66,14 @@ fun DeviceDetailScreen(
         }
     }
 
+    LaunchedEffect(success) {
+        if (!success.isNullOrBlank()) {
+            snackbarHostState.showSnackbar(success!!)
+            viewModel.clearSuccess()
+        }
+    }
+
+    // ── Rename dialog ──────────────────────────────────────────────────────────
     if (showRenameDialog) {
         AlertDialog(
             onDismissRequest = { showRenameDialog = false },
@@ -68,6 +88,7 @@ fun DeviceDetailScreen(
         )
     }
 
+    // ── Delete dialog ──────────────────────────────────────────────────────────
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
@@ -82,6 +103,28 @@ fun DeviceDetailScreen(
                 }
             },
             dismissButton = { TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") } },
+        )
+    }
+
+    // ── OTA confirmation dialog ────────────────────────────────────────────────
+    if (showOtaDialog) {
+        AlertDialog(
+            onDismissRequest = { showOtaDialog = false },
+            title = { Text("Update firmware?") },
+            text = {
+                Text(
+                    "This will install firmware v${latestFirmware?.version} on the device. " +
+                    "The device will download the update and reboot automatically. " +
+                    "This takes about 30–60 seconds.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showOtaDialog = false
+                    viewModel.triggerOta(deviceId)
+                }) { Text("Update") }
+            },
+            dismissButton = { TextButton(onClick = { showOtaDialog = false }) { Text("Cancel") } },
         )
     }
 
@@ -105,7 +148,12 @@ fun DeviceDetailScreen(
             return@Scaffold
         }
 
-        LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        LazyColumn(
+            Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            // ── Device status card ────────────────────────────────────────────
             item {
                 Card {
                     Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -117,7 +165,9 @@ fun DeviceDetailScreen(
                                 StatusChip(device!!.status)
                             }
                             Text("Hopper: ${device!!.hopper_pct}%", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                            device!!.firmware_version?.let { Text("Firmware: $it", style = MaterialTheme.typography.bodySmall, color = TextSecondary) }
+                            device!!.firmware_version?.let {
+                                Text("Firmware: $it", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                            }
                             device!!.last_seen_at?.let {
                                 val lastSeen = runCatching { formatter.format(Instant.parse(it)) }.getOrDefault(it)
                                 Text("Last seen: $lastSeen", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
@@ -127,6 +177,59 @@ fun DeviceDetailScreen(
                 }
             }
 
+            // ── Firmware update card (only shown when update is available) ────
+            if (isOwner) {
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (updateAvailable)
+                                MaterialTheme.colorScheme.primaryContainer
+                            else
+                                MaterialTheme.colorScheme.surfaceVariant,
+                        ),
+                    ) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(Icons.Default.SystemUpdate, contentDescription = null)
+                                Text("Firmware", style = MaterialTheme.typography.titleSmall)
+                            }
+
+                            when {
+                                latestFirmware == null -> Text(
+                                    "No firmware uploaded yet",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = TextSecondary,
+                                )
+                                updateAvailable -> Text(
+                                    "Update available: v${latestFirmware!!.version} (device has v${device!!.firmware_version})",
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                                else -> Text(
+                                    "Up to date: v${latestFirmware!!.version}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = TextSecondary,
+                                )
+                            }
+
+                            // Update button — only shown when update is available and device is online
+                            if (updateAvailable && device!!.status == "online") {
+                                Button(
+                                    onClick = { showOtaDialog = true },
+                                    enabled = !otaInProgress,
+                                ) {
+                                    if (otaInProgress) {
+                                        CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                                        Spacer(Modifier.width(8.dp))
+                                    }
+                                    Text("Update to v${latestFirmware!!.version}")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Events ────────────────────────────────────────────────────────
             item { Text("Recent events", style = MaterialTheme.typography.titleSmall) }
 
             if (events.isEmpty()) {

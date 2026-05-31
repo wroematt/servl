@@ -166,4 +166,10 @@ interface ApiService {
         @Query("page") page: Int = 1,
         @Query("page_size") pageSize: Int = 20,
     ): DeviceEventsResponse
+
+    @GET("devices/firmware/latest")
+    suspend fun getLatestFirmware(): FirmwareImageDto
+
+    @POST("devices/{deviceId}/ota")
+    suspend fun triggerOta(@Path("deviceId") deviceId: String): Map<String, String>
 }

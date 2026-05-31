@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.servl.app.data.network.dto.DeviceDto
 import com.servl.app.data.network.dto.DeviceEventDto
+import com.servl.app.data.network.dto.FirmwareImageDto
 import com.servl.app.data.repository.DeviceRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
@@ -29,6 +30,16 @@ class DeviceViewModel @Inject constructor(
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
+
+    // null = not yet loaded, non-null = latest firmware metadata from server
+    private val _latestFirmware = MutableStateFlow<FirmwareImageDto?>(null)
+    val latestFirmware: StateFlow<FirmwareImageDto?> = _latestFirmware.asStateFlow()
+
+    private val _otaInProgress = MutableStateFlow(false)
+    val otaInProgress: StateFlow<Boolean> = _otaInProgress.asStateFlow()
+
+    private val _success = MutableStateFlow<String?>(null)
+    val success: StateFlow<String?> = _success.asStateFlow()
 
     // Poll devices list every 30s
     init {
@@ -77,5 +88,28 @@ class DeviceViewModel @Inject constructor(
         }
     }
 
+    fun loadLatestFirmware() {
+        viewModelScope.launch {
+            try { _latestFirmware.value = deviceRepository.getLatestFirmware() }
+            catch (_: Exception) { /* 404 = no firmware uploaded yet — leave null */ }
+        }
+    }
+
+    fun triggerOta(deviceId: String) {
+        viewModelScope.launch {
+            _otaInProgress.value = true
+            _error.value = null
+            try {
+                deviceRepository.triggerOta(deviceId)
+                _success.value = "OTA update command sent — device will flash and reboot"
+            } catch (e: Exception) {
+                _error.value = e.message ?: "Failed to send OTA command"
+            } finally {
+                _otaInProgress.value = false
+            }
+        }
+    }
+
     fun clearError() { _error.value = null }
+    fun clearSuccess() { _success.value = null }
 }

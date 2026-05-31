@@ -113,6 +113,15 @@ app.use('/webhook/google-home', createProxyMiddleware({
   pathRewrite: rewritePath('/webhook/google-home'),
 }));
 
+// Firmware binary download — no JWT required; the firmware UUID in the URL
+// acts as an unguessable token. Must be registered before the authenticated
+// /devices block below so the ESP32 can reach it without a Bearer token.
+app.use('/devices/firmware', createProxyMiddleware({
+  target: DEVICE_SERVICE_URL,
+  changeOrigin: true,
+  pathRewrite: rewritePath('/devices/firmware'),
+}));
+
 // ── Authenticated routes ──────────────────────
 
 app.use('/users', apiLimiter, requireAuth, createProxyMiddleware({

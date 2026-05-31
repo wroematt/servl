@@ -28,10 +28,10 @@ constexpr uint32_t MQTT_CONNECT_TIMEOUT_MS =  8000;
 // Must be large enough for the largest inbound command JSON (~150 bytes) plus
 // PubSubClient header overhead.  Defined here; mqtt_conn.cpp sets it before
 // including PubSubClient.h.
-constexpr int MQTT_MAX_PACKET = 512;
+constexpr int MQTT_MAX_PACKET = 1024;
 
 // ─── Firmware identity ───────────────────────────────────────────────────────
-constexpr char FIRMWARE_VERSION[] = "1.2.0";
+constexpr char FIRMWARE_VERSION[] = "1.3.6";
 
 // BLE device name prefix — last 4 hex digits of MAC are appended at runtime
 // so multiple units can be distinguished (e.g. "Servl-A1B2").

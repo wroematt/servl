@@ -42,3 +42,12 @@ data class ProvisionDeviceRequest(
 )
 
 data class UpdateDeviceRequest(val name: String)
+
+data class FirmwareImageDto(
+    val id: String,
+    val version: String,
+    val filename: String,
+    val size_bytes: Int,
+    val sha256: String,
+    val uploaded_at: String,
+)
