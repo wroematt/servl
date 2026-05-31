@@ -209,7 +209,8 @@ services:
     container_name: pf_mosquitto
     restart: unless-stopped
     ports:
-      - "8883:8883"
+      - "1883:1883"    # ESP32 devices on the LAN connect here (prototype: no TLS)
+      - "8883:8883"    # reserved for TLS device listener when certs are ready
     volumes:
       - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - ./mosquitto/config/passwd:/mosquitto/config/passwd

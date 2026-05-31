@@ -13,6 +13,9 @@ data class DeviceDto(
     val last_seen_at: String?,
     val created_at: String,
     val events: List<DeviceEventDto>?,
+    // Only present in the POST /devices (provision) response — never stored on the device.
+    val mqtt_user: String? = null,
+    val mqtt_pass: String? = null,
 )
 
 data class DeviceEventDto(

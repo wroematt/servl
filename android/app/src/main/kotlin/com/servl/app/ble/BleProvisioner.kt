@@ -125,6 +125,10 @@ class BleProvisioner(private val context: Context) {
             override fun onCharacteristicWrite(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
                 gattEventChannel.trySend(GattEvent.CharacteristicWritten(status == BluetoothGatt.GATT_SUCCESS))
             }
+            override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: android.bluetooth.BluetoothGattDescriptor, status: Int) {
+                // Reuse CharacteristicWritten so the provisioning coroutine can consume it.
+                gattEventChannel.trySend(GattEvent.CharacteristicWritten(status == BluetoothGatt.GATT_SUCCESS))
+            }
             override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
                 val value = characteristic.value?.toString(Charsets.UTF_8) ?: ""
                 gattEventChannel.trySend(GattEvent.NotificationReceived(value))
@@ -134,25 +138,33 @@ class BleProvisioner(private val context: Context) {
         bluetoothGatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
 
         try {
-            withTimeout(30_000) {
-                // Wait for services discovered
+            // Outer timeout covers GATT setup + credential writes + device WiFi/MQTT test.
+            // WiFi timeout = 15 s, MQTT timeout = 8 s → allow 40 s total.
+            withTimeout(40_000) {
+                // Wait for connection state change
                 var event = gattEventChannel.receive()
                 if (event is GattEvent.Disconnected) return@withTimeout Result.failure<Unit>(Exception("Device disconnected"))
-                event = gattEventChannel.receive() // ServicesDiscovered
+                // Wait for services discovered
+                event = gattEventChannel.receive()
                 if (event !is GattEvent.ServicesDiscovered) return@withTimeout Result.failure<Unit>(Exception("Services not discovered"))
 
                 val gatt = bluetoothGatt ?: return@withTimeout Result.failure(Exception("GATT not connected"))
                 val service = gatt.getService(ServlGattUuids.PROVISION_SERVICE)
                     ?: return@withTimeout Result.failure(Exception("Provisioning service not found on device"))
 
-                // Enable notifications on status characteristic
+                // Enable notifications on status characteristic and wait for the
+                // descriptor write acknowledgement before proceeding.
                 val statusChar = service.getCharacteristic(ServlGattUuids.STATUS_NOTIFY_CHAR)
                 gatt.setCharacteristicNotification(statusChar, true)
                 val cccd = statusChar.getDescriptor(ServlGattUuids.CCCD)
-                cccd?.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-                cccd?.let { gatt.writeDescriptor(it) }
+                if (cccd != null) {
+                    cccd.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                    gatt.writeDescriptor(cccd)
+                    // Consume the descriptor write callback so the channel stays clean.
+                    gattEventChannel.receive()
+                }
 
-                // Write each characteristic in sequence (wait for ack between each)
+                // Write each characteristic in sequence (wait for write-ack between each).
                 suspend fun writeChar(uuid: java.util.UUID, bytes: ByteArray): Boolean {
                     val char = service.getCharacteristic(uuid) ?: return false
                     char.value = bytes
@@ -172,7 +184,20 @@ class BleProvisioner(private val context: Context) {
                 if (!writeChar(ServlGattUuids.MQTT_CONFIG_CHAR, mqttConfig.toByteArray())) return@withTimeout Result.failure(Exception("Failed to write MQTT config"))
                 if (!writeChar(ServlGattUuids.COMMIT_CHAR, byteArrayOf(0x01))) return@withTimeout Result.failure(Exception("Failed to send commit"))
 
-                Result.success(Unit)
+                // Wait for the device to test WiFi + MQTT and notify the result.
+                // The device sends "OK" on success, or "ERROR:wifi" / "ERROR:mqtt" on failure.
+                // It stays connected on error so the user can correct and retry.
+                val resultEvent = gattEventChannel.receive()
+                when {
+                    resultEvent is GattEvent.NotificationReceived && resultEvent.value == "OK" ->
+                        Result.success(Unit)
+                    resultEvent is GattEvent.NotificationReceived ->
+                        Result.failure(Exception(resultEvent.value))   // "ERROR:wifi" or "ERROR:mqtt"
+                    resultEvent is GattEvent.Disconnected ->
+                        Result.failure(Exception("Device disconnected before confirming credentials"))
+                    else ->
+                        Result.failure(Exception("Unexpected BLE event during provisioning"))
+                }
             }
         } catch (e: TimeoutCancellationException) {
             Result.failure(Exception("Provisioning timed out"))

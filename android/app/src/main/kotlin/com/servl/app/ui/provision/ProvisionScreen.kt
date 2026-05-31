@@ -63,7 +63,7 @@ fun ProvisionScreen(
                     onDeviceSelected = { viewModel.selectDevice(it) },
                 )
                 ProvisionStep.CREDENTIALS -> CredentialsStep(
-                    onConnect = { name, ssid, pass, mqttPass -> viewModel.provision(name, ssid, pass, mqttPass) },
+                    onConnect = { name, ssid, pass -> viewModel.provision(name, ssid, pass) },
                     onBack = { viewModel.reset() },
                 )
                 ProvisionStep.PROVISIONING -> ProgressStep(message = statusMessage)
@@ -132,13 +132,12 @@ private fun ScanStep(
 
 @Composable
 private fun CredentialsStep(
-    onConnect: (deviceName: String, ssid: String, wifiPassword: String, mqttPassword: String) -> Unit,
+    onConnect: (deviceName: String, ssid: String, wifiPassword: String) -> Unit,
     onBack: () -> Unit,
 ) {
     var deviceName by remember { mutableStateOf("") }
     var ssid by remember { mutableStateOf("") }
     var wifiPassword by remember { mutableStateOf("") }
-    var mqttPassword by remember { mutableStateOf("") }
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -162,25 +161,12 @@ private fun CredentialsStep(
             singleLine = true,
         )
 
-        HorizontalDivider()
-        Text("MQTT broker", style = MaterialTheme.typography.titleSmall)
-
-        OutlinedTextField(
-            value = mqttPassword,
-            onValueChange = { mqttPassword = it },
-            label = { Text("Broker password") },
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-        )
-
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f)) { Text("Back") }
             Button(
-                onClick = { onConnect(deviceName, ssid, wifiPassword, mqttPassword) },
+                onClick = { onConnect(deviceName, ssid, wifiPassword) },
                 modifier = Modifier.weight(1f),
-                enabled = deviceName.isNotBlank() && ssid.isNotBlank() && mqttPassword.isNotBlank(),
+                enabled = deviceName.isNotBlank() && ssid.isNotBlank(),
             ) { Text("Connect") }
         }
     }

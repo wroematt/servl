@@ -66,7 +66,7 @@ class ProvisionViewModel @Inject constructor(
      * (colons stripped, e.g. "AA:BB:CC:DD:EE:FF" → "AABBCCDDEEFF"), so the user
      * never has to type it.
      */
-    fun provision(deviceName: String, ssid: String, wifiPassword: String, mqttPassword: String) {
+    fun provision(deviceName: String, ssid: String, wifiPassword: String) {
         _step.value = ProvisionStep.PROVISIONING
         viewModelScope.launch {
             try {
@@ -75,9 +75,14 @@ class ProvisionViewModel @Inject constructor(
                 // Derive the serial number from the BLE MAC address (unique, stable, no user input).
                 val serialNumber = address.replace(":", "")
 
-                // Step 1: register in backend
+                // Step 1: register in backend — response includes MQTT credentials.
                 _statusMessage.value = "Registering device…"
                 val device = deviceRepository.provisionDevice(deviceName, serialNumber)
+
+                val mqttUser = device.mqtt_user
+                    ?: throw Exception("Backend did not return MQTT credentials")
+                val mqttPass = device.mqtt_pass
+                    ?: throw Exception("Backend did not return MQTT credentials")
 
                 // Step 2: BLE provisioning
                 _statusMessage.value = "Connecting to device…"
@@ -94,8 +99,8 @@ class ProvisionViewModel @Inject constructor(
                     mqttBroker    = mqttBroker,
                     mqttPort      = 1883,
                     mqttClientId  = device.mqtt_client_id,
-                    mqttUser      = "internal_service",
-                    mqttPass      = mqttPassword,
+                    mqttUser      = mqttUser,
+                    mqttPass      = mqttPass,
                 )
 
                 if (bleResult.isFailure) throw bleResult.exceptionOrNull() ?: Exception("BLE provisioning failed")

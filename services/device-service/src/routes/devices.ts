@@ -3,6 +3,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import crypto from 'crypto';
 import { db } from '../lib/db';
+import { config } from '../config';
 
 export const devicesRouter = Router();
 
@@ -57,7 +58,15 @@ devicesRouter.post('/', async (req: Request, res: Response) => {
      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
     [deviceUuid, householdId, body.data.name, body.data.serial_number, mqttClientId, certFingerprint],
   );
-  return res.status(201).json(result.rows[0]);
+
+  // Return MQTT credentials alongside the device record so the Android app
+  // can provision the ESP32 over BLE without any user input.
+  // mqtt_pass is never stored — it lives only in .env and in this one-time response.
+  return res.status(201).json({
+    ...result.rows[0],
+    mqtt_user: config.MQTT_INTERNAL_USER,
+    mqtt_pass: config.MQTT_INTERNAL_PASS,
+  });
 });
 
 // ── GET /devices/:deviceId ─────────────────────
