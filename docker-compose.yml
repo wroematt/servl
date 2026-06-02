@@ -26,7 +26,7 @@ services:
       context: .
       dockerfile: website/Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: http://localhost:3000
+        NEXT_PUBLIC_API_URL: https://api.servl.uk
     container_name: pf_website
     restart: unless-stopped
     ports:
