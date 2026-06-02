@@ -9,12 +9,19 @@ import { CronJob } from 'cron';
 import pg from 'pg';
 import IORedis from 'ioredis';
 
+// External ioredis instance — used only for dedup key management (redis.set).
+// NOT passed to BullMQ to avoid the ioredis version type conflict: BullMQ 5.x
+// bundles its own ioredis internally and their types are incompatible at compile
+// time even though they are functionally identical at runtime.
 const redis = new IORedis(process.env.REDIS_URL!, { maxRetriesPerRequest: null });
 const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 
+// BullMQ connection — pass a URL object so BullMQ uses its own bundled ioredis.
+const bullConnection = { url: process.env.REDIS_URL! };
+
 // ── Queue definitions ─────────────────────────
 
-const feedQueue = new Queue('feed-jobs', { connection: redis });
+const feedQueue = new Queue('feed-jobs', { connection: bullConnection });
 
 // ── Cron: every minute, find due schedules ────
 
@@ -98,7 +105,7 @@ const feedWorker = new Worker('feed-jobs', async (job: Job) => {
   console.log(`[worker] job ${job.id} OK — feed_event=${result['id'] ?? JSON.stringify(result)}`);
   return result;
 }, {
-  connection: redis,
+  connection: bullConnection,
   concurrency: 5,
 });
 
