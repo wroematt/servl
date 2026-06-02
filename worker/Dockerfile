@@ -12,15 +12,18 @@ COPY worker/index.ts ./worker/
 WORKDIR /app/worker
 RUN npm run build
 
-# Stage 2 — production image
+# Prune devDependencies from the workspace so the runner image stays lean
+WORKDIR /app
+RUN npm prune --omit=dev
+
+# Stage 2 — production image (no network access needed)
 FROM node:20-alpine AS runner
 WORKDIR /app
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
 COPY worker/package.json ./
-RUN npm install --omit=dev && npm cache clean --force
-
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/worker/dist ./dist
 
 USER appuser
