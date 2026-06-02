@@ -22,6 +22,7 @@ services:
 
   # ── WEBSITE (Next.js dashboard) ────────────
   website:
+    image: wroematt/servl-website:latest
     build:
       context: .
       dockerfile: website/Dockerfile
@@ -38,6 +39,7 @@ services:
 
   # ── API GATEWAY ────────────────────────────
   api-gateway:
+    image: wroematt/servl-api-gateway:latest
     build:
       context: .
       dockerfile: services/api-gateway/Dockerfile
@@ -65,6 +67,7 @@ services:
 
   # ── USER & AUTH SERVICE ────────────────────
   user-service:
+    image: wroematt/servl-user-service:latest
     build:
       context: .
       dockerfile: services/user-service/Dockerfile
@@ -99,6 +102,7 @@ services:
 
   # ── PET & FEED HISTORY SERVICE ─────────────
   pet-service:
+    image: wroematt/servl-pet-service:latest
     build:
       context: .
       dockerfile: services/pet-service/Dockerfile
@@ -119,6 +123,7 @@ services:
 
   # ── DEVICE SERVICE ─────────────────────────
   device-service:
+    image: wroematt/servl-device-service:latest
     build:
       context: .
       dockerfile: services/device-service/Dockerfile
@@ -145,6 +150,7 @@ services:
 
   # ── FEED SERVICE ───────────────────────────
   feed-service:
+    image: wroematt/servl-feed-service:latest
     build:
       context: .
       dockerfile: services/feed-service/Dockerfile
@@ -166,6 +172,7 @@ services:
 
   # ── NOTIFICATION SERVICE ───────────────────
   notification-service:
+    image: wroematt/servl-notification-service:latest
     build:
       context: .
       dockerfile: services/notification-service/Dockerfile
@@ -186,6 +193,7 @@ services:
 
   # ── SCHEDULE WORKER ────────────────────────
   worker:
+    image: wroematt/servl-worker:latest
     build:
       context: .
       dockerfile: worker/Dockerfile
