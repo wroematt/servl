@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.servl.app.BuildConfig
 import com.servl.app.ble.BleProvisioner
 import com.servl.app.data.network.dto.DeviceDto
 import com.servl.app.data.repository.DeviceRepository
@@ -67,7 +66,7 @@ class ProvisionViewModel @Inject constructor(
      * (colons stripped, e.g. "AA:BB:CC:DD:EE:FF" → "AABBCCDDEEFF"), so the user
      * never has to type it.
      */
-    fun provision(deviceName: String, ssid: String, wifiPassword: String) {
+    fun provision(deviceName: String, ssid: String, wifiPassword: String, mqttBrokerIp: String) {
         _step.value = ProvisionStep.PROVISIONING
         viewModelScope.launch {
             try {
@@ -89,19 +88,17 @@ class ProvisionViewModel @Inject constructor(
                 val mqttPass = device.mqtt_pass
                     ?: throw Exception("Backend did not return MQTT credentials")
 
-                // Step 2: BLE provisioning
+                // Step 2: BLE provisioning.
+                // The MQTT broker must be reachable from the ESP32 over the local network.
+                // Mosquitto listens on port 1883 on the Raspberry Pi's LAN IP — the user
+                // enters this IP in the provisioning wizard (e.g. 192.168.1.100).
                 _statusMessage.value = "Connecting to device…"
-
-                // Extract MQTT broker host from BASE_URL (strip scheme and port).
-                val mqttBroker = BuildConfig.BASE_URL
-                    .removePrefix("http://").removePrefix("https://")
-                    .substringBefore(":")   // remove port if present
 
                 val bleResult = bleProvisioner.provision(
                     deviceAddress = address,
                     ssid          = ssid,
                     wifiPassword  = wifiPassword,
-                    mqttBroker    = mqttBroker,
+                    mqttBroker    = mqttBrokerIp.trim(),
                     mqttPort      = 1883,
                     mqttClientId  = device.mqtt_client_id,
                     mqttUser      = mqttUser,

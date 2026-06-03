@@ -20,8 +20,8 @@ android {
         applicationId = "com.servl.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 12
-        versionName = "1.9.2"
+        versionCode = 13
+        versionName = "1.9.3"
 
         // Debug: replace with your PC's local IP when testing on a physical device
         // e.g. "http://192.168.50.41:3000"  (run `ipconfig` on your PC to find it)
@@ -48,6 +48,12 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    lint {
+        // Known bug in androidx.lifecycle lint detector conflicting with Kotlin 2.x.
+        // See: https://issuetracker.google.com/issues/247542825
+        disable += "NullSafeMutableLiveData"
     }
 }
 

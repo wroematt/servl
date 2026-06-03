@@ -61,7 +61,7 @@ fun ProvisionScreen(
                     onDeviceSelected = { viewModel.selectDevice(it) },
                 )
                 ProvisionStep.CREDENTIALS -> CredentialsStep(
-                    onConnect = { name, ssid, pass -> viewModel.provision(name, ssid, pass) },
+                    onConnect = { name, ssid, pass, broker -> viewModel.provision(name, ssid, pass, broker) },
                     onBack = { viewModel.reset() },
                 )
                 ProvisionStep.PROVISIONING -> ProgressStep(message = statusMessage)
@@ -130,12 +130,13 @@ private fun ScanStep(
 
 @Composable
 private fun CredentialsStep(
-    onConnect: (deviceName: String, ssid: String, wifiPassword: String) -> Unit,
+    onConnect: (deviceName: String, ssid: String, wifiPassword: String, mqttBrokerIp: String) -> Unit,
     onBack: () -> Unit,
 ) {
     var deviceName by remember { mutableStateOf("") }
     var ssid by remember { mutableStateOf("") }
     var wifiPassword by remember { mutableStateOf("") }
+    var mqttBrokerIp by remember { mutableStateOf("") }
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -156,12 +157,25 @@ private fun CredentialsStep(
             modifier = Modifier.fillMaxWidth(),
         )
 
+        HorizontalDivider()
+        Text("Server", style = MaterialTheme.typography.titleSmall)
+
+        OutlinedTextField(
+            value = mqttBrokerIp,
+            onValueChange = { mqttBrokerIp = it },
+            label = { Text("Raspberry Pi local IP") },
+            placeholder = { Text("e.g. 192.168.1.100") },
+            supportingText = { Text("The local IP address of your Servl hub (run hostname -I on the Pi)") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+        )
+
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f)) { Text("Back") }
             Button(
-                onClick = { onConnect(deviceName, ssid, wifiPassword) },
+                onClick = { onConnect(deviceName, ssid, wifiPassword, mqttBrokerIp) },
                 modifier = Modifier.weight(1f),
-                enabled = deviceName.isNotBlank() && ssid.isNotBlank(),
+                enabled = deviceName.isNotBlank() && ssid.isNotBlank() && mqttBrokerIp.isNotBlank(),
             ) { Text("Connect") }
         }
     }
