@@ -56,6 +56,7 @@ services:
       - DEVICE_SERVICE_URL=http://device-service:3003
       - NOTIFICATION_SERVICE_URL=http://notification-service:3004
       - FEED_SERVICE_URL=http://feed-service:3005
+      - CORS_ORIGIN=https://app.servl.uk
     networks:
       - internal
     depends_on:
