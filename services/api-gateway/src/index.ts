@@ -9,6 +9,10 @@ import { errorHandler } from './middleware/error';
 
 const app = express();
 
+// Trust the first proxy (Cloudflare Tunnel) so express-rate-limit can
+// correctly identify clients from the X-Forwarded-For header.
+app.set('trust proxy', 1);
+
 app.use(helmet({
   // The gateway is intentionally cross-origin: the website (port 3006) loads
   // images and data from the API (port 3000). Helmet's default 'same-origin'
