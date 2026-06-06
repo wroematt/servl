@@ -91,6 +91,7 @@ services:
       - INVITE_TOKEN_TTL=86400
       - RESET_TOKEN_TTL=3600
       - USER_MEDIA_UPLOAD_PATH=/user-uploads
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
     volumes:
       - user_media_uploads:/user-uploads
     networks:
