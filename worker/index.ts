@@ -109,8 +109,26 @@ const feedWorker = new Worker('feed-jobs', async (job: Job) => {
   concurrency: 5,
 });
 
-feedWorker.on('failed', (job, err) => {
+feedWorker.on('failed', async (job, err) => {
   console.error(`[worker] job ${job?.id} permanently failed after all retries: ${err.message}`);
+
+  // Notify household owners that a scheduled feed could not be delivered
+  if (!job || !process.env.NOTIFICATION_SERVICE_URL) return;
+  const { pet_id } = job.data as { pet_id: string };
+  try {
+    const { rows } = await db.query(
+      'SELECT name, household_id FROM pets WHERE id = $1',
+      [pet_id],
+    );
+    if (!rows[0]) return;
+    await fetch(`${process.env.NOTIFICATION_SERVICE_URL}/internal/notify/feed-failed`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ household_id: rows[0].household_id, pet_name: rows[0].name }),
+    });
+  } catch (notifErr) {
+    console.error('[worker] Failed to send feed-failed notification:', notifErr);
+  }
 });
 
 // ── Helpers ───────────────────────────────────

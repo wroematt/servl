@@ -30,15 +30,28 @@ export async function sendToToken(
   token: string,
   title: string,
   body: string,
+  channelId: string,
   data?: Record<string, string>,
 ) {
   const messaging = getMessaging();
-  if (!messaging) return; // placeholder creds in local dev — skip silently
+  if (!messaging) {
+    console.error('[FCM] Cannot send notification — Firebase Admin SDK not initialised. Check FCM_PROJECT_ID, FCM_CLIENT_EMAIL, FCM_PRIVATE_KEY in .env.');
+    return;
+  }
 
+  console.log(`[FCM] Sending "${title}" (channel: ${channelId}) to token ${token.slice(0, 15)}…`);
   try {
-    await messaging.send({ token, notification: { title, body }, data });
+    const result = await messaging.send({
+      token,
+      notification: { title, body },
+      // Route the notification to the correct Android channel so each type can
+      // be individually enabled / disabled in the system notification settings.
+      android: { notification: { channelId } },
+      data,
+    });
+    console.log(`[FCM] Delivered — message ID: ${result}`);
   } catch (err) {
     // Log but don't throw — notification failures must not block the caller
-    console.error(`FCM send failed for token ${token.slice(0, 10)}…:`, err);
+    console.error(`[FCM] Send failed for token ${token.slice(0, 15)}…:`, err);
   }
 }

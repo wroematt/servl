@@ -54,16 +54,53 @@ async function handleStatusMessage(deviceId: string, msg: MqttStatusPayload) {
     return;
   }
 
-  // Fetch previous status so we can detect an offline→online transition.
-  const prev = await db.query('SELECT status FROM devices WHERE id = $1', [deviceId]);
-  const wasOffline = !prev.rows[0] || prev.rows[0].status !== 'online';
+  // Read-modify-write the device row INSIDE a transaction with a row lock
+  // (SELECT ... FOR UPDATE). This makes the "read previous state, then write
+  // new state" sequence atomic per device, so two status messages for the same
+  // device that arrive close together (QoS redelivery, broker bursts, etc.)
+  // can never both observe the pre-update state as "ok" — which is exactly
+  // the kind of race that would make a one-shot threshold alert re-fire on
+  // every message instead of only once per episode.
+  let wasOffline: boolean;
+  let prevHopperPct: number;
+  let prevStatus: string | undefined;
+  const txClient = await db.connect();
+  try {
+    await txClient.query('BEGIN');
+    const prev = await txClient.query(
+      'SELECT status, hopper_pct FROM devices WHERE id = $1 FOR UPDATE',
+      [deviceId],
+    );
+    prevStatus    = prev.rows[0]?.status;
+    wasOffline    = !prev.rows[0] || prev.rows[0].status !== 'online';
+    prevHopperPct = prev.rows[0]?.hopper_pct ?? 100;
 
-  await db.query(
-    `UPDATE devices
-     SET hopper_pct = $1, last_seen_at = NOW(), status = 'online',
-         firmware_version = COALESCE($2, firmware_version)
-     WHERE id = $3`,
-    [msg.hopper_pct, msg.firmware_version ?? null, deviceId],
+    await txClient.query(
+      `UPDATE devices
+       SET hopper_pct = $1, last_seen_at = NOW(), status = 'online',
+           firmware_version = COALESCE($2, firmware_version)
+       WHERE id = $3`,
+      [msg.hopper_pct, msg.firmware_version ?? null, deviceId],
+    );
+    await txClient.query('COMMIT');
+  } catch (err) {
+    await txClient.query('ROLLBACK').catch(() => {});
+    console.error(
+      `[mqtt] hopper read/update transaction failed for device ${deviceId} ` +
+      `(msg.hopper_pct=${JSON.stringify(msg.hopper_pct)}):`,
+      err,
+    );
+    throw err;
+  } finally {
+    txClient.release();
+  }
+
+  // TEMP DIAGNOSTIC — remove once the repeat-notification issue is root-caused.
+  console.log(
+    `[mqtt][diag] device=${deviceId} prevStatus=${prevStatus} ` +
+    `prevHopperPct=${prevHopperPct} msg.hopper_pct=${msg.hopper_pct} msg.status=${msg.status} ` +
+    `wasOkBefore=${prevHopperPct >= 20} isNowLow=${msg.hopper_pct < 20 || msg.status === 'low_hopper'} ` +
+    `willNotify=${(msg.hopper_pct < 20 || msg.status === 'low_hopper') && prevHopperPct >= 20}`,
   );
 
   // 1b. If the device just came back online, republish any feed commands that
@@ -77,16 +114,75 @@ async function handleStatusMessage(deviceId: string, msg: MqttStatusPayload) {
 
   // 2. Confirm feed event if this is a dispense acknowledgement
   if (msg.command_id) {
-    await db.query(
+    const updated = await db.query(
       `UPDATE feed_events
        SET status = 'confirmed', weight_dispensed_g = $1
-       WHERE id = $2 AND status = 'pending'`,
+       WHERE id = $2 AND status = 'pending'
+       RETURNING pet_id, weight_dispensed_g`,
       [msg.dispensed_g ?? 0, msg.command_id],
     );
+
+    // Notify the household that the meal was served, and check for overfeed
+    if (updated.rows.length > 0 && config.NOTIFICATION_SERVICE_URL) {
+      const { pet_id, weight_dispensed_g } = updated.rows[0];
+      const [deviceRow, petRow, todayRow] = await Promise.all([
+        db.query('SELECT household_id FROM devices WHERE id = $1', [deviceId]),
+        db.query('SELECT name FROM pets WHERE id = $1', [pet_id]),
+        // Sum today's confirmed feeds for this pet and get daily target
+        db.query(
+          `SELECT COALESCE(SUM(fe.weight_dispensed_g), 0) AS total_today_g,
+                  p.daily_target_g
+           FROM   feed_events fe
+           JOIN   pets p ON p.id = fe.pet_id
+           WHERE  fe.pet_id = $1
+             AND  fe.status = 'confirmed'
+             AND  fe.dispensed_at >= CURRENT_DATE
+           GROUP BY p.daily_target_g`,
+          [pet_id],
+        ),
+      ]);
+
+      if (deviceRow.rows[0] && petRow.rows[0]) {
+        const notifBase = {
+          household_id: deviceRow.rows[0].household_id,
+          pet_name:     petRow.rows[0].name,
+        };
+
+        // Feed confirmation notification
+        fetch(`${config.NOTIFICATION_SERVICE_URL}/internal/notify/feed`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...notifBase, weight_g: weight_dispensed_g }),
+        }).catch((err) => console.error('Feed notification error:', err));
+
+        // Overfeed notification — fires exactly once when the daily total first
+        // crosses the target (previous total was within budget, now over it).
+        if (todayRow.rows.length > 0) {
+          const { total_today_g, daily_target_g } = todayRow.rows[0];
+          const prevTotal = Number(total_today_g) - weight_dispensed_g;
+          if (prevTotal <= daily_target_g && Number(total_today_g) > daily_target_g) {
+            fetch(`${config.NOTIFICATION_SERVICE_URL}/internal/notify/overfeed`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                ...notifBase,
+                total_today_g:  Number(total_today_g),
+                daily_target_g: daily_target_g,
+              }),
+            }).catch((err) => console.error('Overfeed notification error:', err));
+          }
+        }
+      }
+    }
   }
 
-  // 3. Log and notify on low hopper
-  if (msg.status === 'low_hopper' || msg.hopper_pct < 20) {
+  // 3. Log and notify when the hopper crosses below 20% — fires exactly once per
+  // episode (the moment it drops below the threshold). No alert if it was already
+  // low on the previous heartbeat. Refilling above 20% resets the episode so the
+  // next drop will alert again.
+  const isNowLow  = msg.hopper_pct < 20 || msg.status === 'low_hopper';
+  const wasOkBefore = prevHopperPct >= 20;
+  if (isNowLow && wasOkBefore) {
     await db.query(
       `INSERT INTO device_events (device_id, event_type, payload)
        VALUES ($1, 'hopper_low', $2)`,
@@ -100,8 +196,8 @@ async function handleStatusMessage(deviceId: string, msg: MqttStatusPayload) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             household_id: device.rows[0].household_id,
-            device_name: device.rows[0].name,
-            hopper_pct: msg.hopper_pct,
+            device_name:  device.rows[0].name,
+            hopper_pct:   msg.hopper_pct,
           }),
         }).catch((err) => console.error('Notification service error:', err));
       }

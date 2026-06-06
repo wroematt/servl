@@ -206,6 +206,7 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - FEED_SERVICE_URL=http://feed-service:3005
+      - NOTIFICATION_SERVICE_URL=http://notification-service:3004
     networks:
       - internal
     depends_on:
@@ -214,6 +215,8 @@ services:
       redis:
         condition: service_healthy
       feed-service:
+        condition: service_started
+      notification-service:
         condition: service_started
 
   # ── MQTT BROKER (Mosquitto) ─────────────────
