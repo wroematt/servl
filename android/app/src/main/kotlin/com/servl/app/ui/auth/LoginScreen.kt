@@ -1,5 +1,6 @@
 package com.servl.app.ui.auth
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
@@ -8,15 +9,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentType
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.credentials.CredentialManager
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.servl.app.BuildConfig
+import com.servl.app.R
 import com.servl.app.ui.components.PasswordTextField
 import com.servl.app.ui.theme.TextSecondary
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -29,6 +40,8 @@ fun LoginScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     val error by viewModel.error.collectAsState()
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -95,13 +108,40 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Disabled Google sign-in placeholder
         OutlinedButton(
-            onClick = {},
-            enabled = false,
+            onClick = {
+                coroutineScope.launch {
+                    try {
+                        val credentialManager = CredentialManager.create(context)
+                        val googleIdOption = GetGoogleIdOption.Builder()
+                            .setFilterByAuthorizedAccounts(false)
+                            .setServerClientId(BuildConfig.GOOGLE_WEB_CLIENT_ID)
+                            .build()
+                        val request = GetCredentialRequest.Builder()
+                            .addCredentialOption(googleIdOption)
+                            .build()
+                        val result = credentialManager.getCredential(context, request)
+                        val credential = result.credential
+                        if (credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
+                            val googleCred = GoogleIdTokenCredential.createFrom(credential.data)
+                            viewModel.loginWithGoogle(googleCred.idToken, onLoginSuccess)
+                        }
+                    } catch (_: GetCredentialCancellationException) {
+                        // User dismissed the picker — no error needed
+                    } catch (e: Exception) {
+                        viewModel.setError("Google Sign-In unavailable: ${e.message}")
+                    }
+                }
+            },
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text("Continue with Google (coming soon)")
+            Image(
+                painter = painterResource(R.drawable.ic_google),
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text("Continue with Google")
         }
 
         TextButton(onClick = onNavigateToForgotPassword) {

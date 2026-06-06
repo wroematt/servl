@@ -20,6 +20,13 @@ class AuthRepository @Inject constructor(
         return response.user ?: api.getMe()
     }
 
+    suspend fun loginWithGoogle(idToken: String): UserDto {
+        val response = api.googleSignIn(GoogleSignInRequest(idToken))
+        tokenDataStore.accessToken = response.accessToken
+        tokenDataStore.saveRefreshToken(response.refreshToken)
+        return response.user ?: api.getMe()
+    }
+
     suspend fun register(name: String, email: String, password: String): UserDto {
         val response = api.register(RegisterRequest(name, email, password))
         tokenDataStore.accessToken = response.accessToken

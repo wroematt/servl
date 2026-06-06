@@ -3,6 +3,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
+import { OAuth2Client } from 'google-auth-library';
 import { db } from '../lib/db';
 import { redis } from '../lib/redis';
 import { sendPasswordReset } from '../lib/email';
@@ -179,6 +180,77 @@ authRouter.post('/forgot-password', async (req: Request, res: Response) => {
     await sendPasswordReset(user.email, resetUrl);
   }
   return res.json({ message: 'If that email is registered, a reset link has been sent.' });
+});
+
+// ── POST /auth/google ──────────────────────────
+// Accepts a Google ID token from the Android Credential Manager, verifies it,
+// and either signs in an existing account or creates a new one.
+
+const googleSchema = z.object({ idToken: z.string() });
+
+authRouter.post('/google', async (req: Request, res: Response) => {
+  const body = googleSchema.safeParse(req.body);
+  if (!body.success) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'Invalid request' });
+  }
+
+  const client = new OAuth2Client(config.GOOGLE_CLIENT_ID);
+  let payload: ReturnType<Awaited<ReturnType<typeof client.verifyIdToken>>['getPayload']>;
+  try {
+    const ticket = await client.verifyIdToken({
+      idToken: body.data.idToken,
+      audience: config.GOOGLE_CLIENT_ID,
+    });
+    payload = ticket.getPayload();
+  } catch {
+    return res.status(401).json({ code: 'INVALID_TOKEN', message: 'Invalid Google ID token' });
+  }
+
+  if (!payload?.sub || !payload.email) {
+    return res.status(401).json({ code: 'INVALID_TOKEN', message: 'Incomplete Google token payload' });
+  }
+
+  const { sub: googleId, email, name, picture } = payload;
+
+  // Look up by google_id first, then fall back to email (auto-link existing account)
+  const existing = await db.query(
+    `SELECT id, household_id, email, name, photo_url, role, fcm_token, created_at, google_id
+     FROM users WHERE google_id = $1 OR (email = $2 AND google_id IS NULL)
+     ORDER BY (google_id = $1) DESC LIMIT 1`,
+    [googleId, email],
+  );
+
+  let user: Record<string, unknown>;
+
+  if (existing.rows.length > 0) {
+    user = { ...existing.rows[0] };
+    // Link google_id to the account if it was found by email only
+    if (!user.google_id) {
+      await db.query('UPDATE users SET google_id = $1 WHERE id = $2', [googleId, user.id]);
+    }
+  } else {
+    // New user — create a household and owner account
+    const displayName = name ?? email.split('@')[0];
+    const hhResult = await db.query(
+      "INSERT INTO households (name) VALUES ($1) RETURNING id",
+      [`${displayName}'s Household`],
+    );
+    const householdId: string = hhResult.rows[0].id;
+
+    const userResult = await db.query(
+      `INSERT INTO users (household_id, email, google_id, name, photo_url, role)
+       VALUES ($1, $2, $3, $4, $5, 'owner')
+       RETURNING id, household_id, email, name, photo_url, role, fcm_token, created_at`,
+      [householdId, email, googleId, displayName, picture ?? null],
+    );
+    user = userResult.rows[0];
+  }
+
+  // Strip google_id from the response (internal field)
+  const { google_id: _gid, ...userForResponse } = user;
+  const accessToken  = issueAccessToken(user.id as string, user.household_id as string, user.role as string);
+  const refreshToken = await issueRefreshToken(user.id as string);
+  return res.json({ accessToken, refreshToken, user: userForResponse });
 });
 
 // ── POST /auth/reset-password ──────────────────

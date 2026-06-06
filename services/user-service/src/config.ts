@@ -16,6 +16,7 @@ const schema = z.object({
   INVITE_TOKEN_TTL: z.string().default('86400').transform(Number),
   RESET_TOKEN_TTL: z.string().default('3600').transform(Number),
   USER_MEDIA_UPLOAD_PATH: z.string().default('/user-uploads'),
+  GOOGLE_CLIENT_ID: z.string(),
 });
 
 export const config = schema.parse(process.env);
