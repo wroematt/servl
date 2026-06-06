@@ -28,6 +28,7 @@ out/
 android/.gradle/
 android/build/
 android/app/build/
+android/app/release/
 android/local.properties
 android/*.keystore
 android/*.jks
@@ -36,6 +37,14 @@ android/captures/
 android/app/.cxx/
 *.apk
 *.aab
+
+# ── Firmware ──────────────────────────────────
+firmware/.vscode/
+
+# ── Documentation / generated files ──────────
+*.docx
+*.gdoc
+package-lock.json
 
 # ── Docker runtime / generated files ─────────
 mosquitto/certs/
