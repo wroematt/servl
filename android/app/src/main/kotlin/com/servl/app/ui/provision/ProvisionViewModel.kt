@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.servl.app.BuildConfig
 import com.servl.app.ble.BleProvisioner
 import com.servl.app.data.network.dto.DeviceDto
 import com.servl.app.data.repository.DeviceRepository
@@ -66,7 +67,7 @@ class ProvisionViewModel @Inject constructor(
      * (colons stripped, e.g. "AA:BB:CC:DD:EE:FF" → "AABBCCDDEEFF"), so the user
      * never has to type it.
      */
-    fun provision(deviceName: String, ssid: String, wifiPassword: String, mqttBrokerIp: String) {
+    fun provision(deviceName: String, ssid: String, wifiPassword: String) {
         _step.value = ProvisionStep.PROVISIONING
         viewModelScope.launch {
             try {
@@ -89,16 +90,16 @@ class ProvisionViewModel @Inject constructor(
                     ?: throw Exception("Backend did not return MQTT credentials")
 
                 // Step 2: BLE provisioning.
-                // The MQTT broker must be reachable from the ESP32 over the local network.
-                // Mosquitto listens on port 1883 on the Raspberry Pi's LAN IP — the user
-                // enters this IP in the provisioning wizard (e.g. 192.168.1.100).
+                // MQTT_BROKER_HOST is set per build variant in build.gradle.kts:
+                //   debug   → Pi LAN IP (for local development)
+                //   release → mqtt.servl.uk (cloud server, no user input needed)
                 _statusMessage.value = "Connecting to device…"
 
                 val bleResult = bleProvisioner.provision(
                     deviceAddress = address,
                     ssid          = ssid,
                     wifiPassword  = wifiPassword,
-                    mqttBroker    = mqttBrokerIp.trim(),
+                    mqttBroker    = BuildConfig.MQTT_BROKER_HOST,
                     mqttPort      = 1883,
                     mqttClientId  = device.mqtt_client_id,
                     mqttUser      = mqttUser,

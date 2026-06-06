@@ -26,6 +26,8 @@ android {
         // Debug: replace with your PC's local IP when testing on a physical device
         // e.g. "http://192.168.50.41:3000"  (run `ipconfig` on your PC to find it)
         buildConfigField("String", "BASE_URL", "\"http://192.168.50.248:3000\"")
+        // Debug: Pi's LAN IP for MQTT (production uses mqtt.servl.uk via release buildType)
+        buildConfigField("String", "MQTT_BROKER_HOST", "\"192.168.50.248\"")
     }
 
     buildTypes {
@@ -35,8 +37,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Override BASE_URL for production builds
+            // Override BASE_URL and MQTT_BROKER_HOST for production builds
             buildConfigField("String", "BASE_URL", "\"https://api.servl.uk\"")
+            buildConfigField("String", "MQTT_BROKER_HOST", "\"mqtt.servl.uk\"")
         }
     }
 
