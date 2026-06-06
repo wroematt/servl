@@ -4,12 +4,16 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import coil3.compose.AsyncImage
 import com.servl.app.ui.auth.AuthState
 import com.servl.app.ui.auth.AuthViewModel
@@ -36,6 +40,20 @@ fun HomeScreen(
     val todayFeeds by viewModel.todayFeeds.collectAsState()
     val feedError by viewModel.feedError.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+
+    // Refresh every time this screen becomes visible (initial load + back-navigation)
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.load()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // Pull-to-refresh state — reset when the background load completes
+    var isRefreshing by remember { mutableStateOf(false) }
+    LaunchedEffect(isLoading) { if (!isLoading) isRefreshing = false }
 
     val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault()) }
 
@@ -65,15 +83,21 @@ fun HomeScreen(
             }
         },
     ) { innerPadding ->
-        if (isLoading) {
+        // Full-screen spinner only on the very first load (no data yet)
+        if (isLoading && pets.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
             return@Scaffold
         }
 
-        LazyColumn(
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { isRefreshing = true; viewModel.load() },
             modifier = Modifier.fillMaxSize().padding(innerPadding),
+        ) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -202,5 +226,6 @@ fun HomeScreen(
                 }
             }
         }
+        } // end PullToRefreshBox
     }
 }

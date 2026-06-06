@@ -20,14 +20,13 @@ android {
         applicationId = "com.servl.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 13
-        versionName = "1.9.3"
+        versionCode = 14
+        versionName = "1.9.4"
 
-        // Debug: replace with your PC's local IP when testing on a physical device
-        // e.g. "http://192.168.50.41:3000"  (run `ipconfig` on your PC to find it)
-        buildConfigField("String", "BASE_URL", "\"http://192.168.50.248:3000\"")
-        // Debug: Pi's LAN IP for MQTT (production uses mqtt.servl.uk via release buildType)
-        buildConfigField("String", "MQTT_BROKER_HOST", "\"192.168.50.248\"")
+        // Debug: points to the same cloud server as release.
+        // To test against a local server instead, change these to your PC's LAN IP.
+        buildConfigField("String", "BASE_URL", "\"https://api.servl.uk\"")
+        buildConfigField("String", "MQTT_BROKER_HOST", "\"mqtt.servl.uk\"")
     }
 
     buildTypes {
