@@ -20,15 +20,15 @@ android {
         applicationId = "com.servl.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 16
-        versionName = "1.9.6"
+        versionCode = 17
+        versionName = "1.9.7"
 
         // Debug: points to the same cloud server as release.
         // To test against a local server instead, change these to your PC's LAN IP.
         buildConfigField("String", "BASE_URL", "\"https://api.servl.uk\"")
         buildConfigField("String", "MQTT_BROKER_HOST", "\"mqtt.servl.uk\"")
         // Firebase Console → Authentication → Sign-in method → Google → Web SDK config → Web client ID
-        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"YOUR_WEB_CLIENT_ID.apps.googleusercontent.com\"")
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"42503743783-4obce0mmlld9uog8unk8f8enh8f290ho.apps.googleusercontent.com\"")
     }
 
     buildTypes {
@@ -41,7 +41,7 @@ android {
             // Override BASE_URL and MQTT_BROKER_HOST for production builds
             buildConfigField("String", "BASE_URL", "\"https://api.servl.uk\"")
             buildConfigField("String", "MQTT_BROKER_HOST", "\"mqtt.servl.uk\"")
-            buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"YOUR_WEB_CLIENT_ID.apps.googleusercontent.com\"")
+            buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"42503743783-4obce0mmlld9uog8unk8f8enh8f290ho.apps.googleusercontent.com\"")
         }
     }
 
