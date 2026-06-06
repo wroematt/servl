@@ -9,8 +9,11 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
@@ -50,10 +53,10 @@ fun EditProfileScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // Avatar
-            Surface(shape = MaterialTheme.shapes.extraLarge, modifier = Modifier.size(80.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+            Surface(shape = CircleShape, modifier = Modifier.size(80.dp), color = MaterialTheme.colorScheme.primaryContainer) {
                 when {
-                    photoUri != null -> AsyncImage(model = photoUri, contentDescription = null, modifier = Modifier.fillMaxSize())
-                    user?.photo_url != null -> AsyncImage(model = resolvePhotoUrl(user.photo_url), contentDescription = null, modifier = Modifier.fillMaxSize())
+                    photoUri != null -> AsyncImage(model = photoUri, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
+                    user?.photo_url != null -> AsyncImage(model = resolvePhotoUrl(user.photo_url), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
                     else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(user?.name?.first()?.uppercase() ?: "", style = MaterialTheme.typography.headlineMedium)
                     }

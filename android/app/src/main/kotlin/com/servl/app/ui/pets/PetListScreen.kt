@@ -10,8 +10,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.foundation.shape.CircleShape
 import coil3.compose.AsyncImage
 import com.servl.app.ui.components.StatusChip
 import com.servl.app.ui.theme.TextSecondary
@@ -59,7 +62,7 @@ fun PetListScreen(
                     Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         // Pet avatar
                         Surface(
-                            shape = MaterialTheme.shapes.medium,
+                            shape = CircleShape,
                             modifier = Modifier.size(56.dp),
                             color = MaterialTheme.colorScheme.primaryContainer,
                         ) {
@@ -67,7 +70,8 @@ fun PetListScreen(
                                 AsyncImage(
                                     model = resolvePhotoUrl(pet.photo_url),
                                     contentDescription = pet.name,
-                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize().clip(CircleShape),
                                 )
                             } else {
                                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

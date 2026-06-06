@@ -3,6 +3,7 @@ package com.servl.app.ui.settings
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Logout
@@ -14,10 +15,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import com.servl.app.BuildConfig
 import com.servl.app.ui.auth.AuthState
 import com.servl.app.ui.auth.AuthViewModel
+import com.servl.app.ui.pets.resolvePhotoUrl
 import com.servl.app.ui.theme.TextSecondary
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -54,9 +59,13 @@ fun SettingsScreen(
                         headlineContent = { Text(u.name) },
                         supportingContent = { Text(u.email) },
                         leadingContent = {
-                            Surface(shape = MaterialTheme.shapes.medium, modifier = Modifier.size(40.dp), color = MaterialTheme.colorScheme.primaryContainer) {
-                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Text(u.name.first().uppercase(), style = MaterialTheme.typography.titleMedium)
+                            Surface(shape = CircleShape, modifier = Modifier.size(40.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+                                if (u.photo_url != null) {
+                                    AsyncImage(model = resolvePhotoUrl(u.photo_url), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
+                                } else {
+                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        Text(u.name.first().uppercase(), style = MaterialTheme.typography.titleMedium)
+                                    }
                                 }
                             }
                         },

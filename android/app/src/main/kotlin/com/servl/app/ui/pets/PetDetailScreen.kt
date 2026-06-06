@@ -10,7 +10,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.CircleShape
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
 import com.servl.app.ui.components.StatusChip
@@ -77,9 +80,9 @@ fun PetDetailScreen(
                 // Header card
                 Card {
                     Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Surface(shape = MaterialTheme.shapes.medium, modifier = Modifier.size(72.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+                        Surface(shape = CircleShape, modifier = Modifier.size(72.dp), color = MaterialTheme.colorScheme.primaryContainer) {
                             if (pet!!.photo_url != null) {
-                                AsyncImage(model = resolvePhotoUrl(pet!!.photo_url), contentDescription = pet!!.name, modifier = Modifier.fillMaxSize())
+                                AsyncImage(model = resolvePhotoUrl(pet!!.photo_url), contentDescription = pet!!.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
                             } else {
                                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                     Text(pet!!.name.first().uppercase(), style = MaterialTheme.typography.headlineMedium)
