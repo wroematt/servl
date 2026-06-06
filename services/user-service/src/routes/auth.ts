@@ -195,16 +195,16 @@ authRouter.post('/google', async (req: Request, res: Response) => {
   }
 
   const client = new OAuth2Client(config.GOOGLE_CLIENT_ID);
-  let payload: ReturnType<Awaited<ReturnType<typeof client.verifyIdToken>>['getPayload']>;
+  let ticket;
   try {
-    const ticket = await client.verifyIdToken({
+    ticket = await client.verifyIdToken({
       idToken: body.data.idToken,
       audience: config.GOOGLE_CLIENT_ID,
     });
-    payload = ticket.getPayload();
   } catch {
     return res.status(401).json({ code: 'INVALID_TOKEN', message: 'Invalid Google ID token' });
   }
+  const payload = ticket.getPayload();
 
   if (!payload?.sub || !payload.email) {
     return res.status(401).json({ code: 'INVALID_TOKEN', message: 'Incomplete Google token payload' });
