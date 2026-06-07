@@ -31,8 +31,23 @@ fun AddEditPetScreen(
 ) {
     val isEdit = petId != null
     val selectedPet by viewModel.selectedPet.collectAsState()
+    val pets by viewModel.pets.collectAsState()
     val error by viewModel.error.collectAsState()
     val devices by deviceViewModel.devices.collectAsState()
+
+    // Feeders already linked to *other* pets — the backend now rejects
+    // double-assigning a device (409 DEVICE_ALREADY_ASSIGNED, see
+    // services/pet-service/src/routes/pets.ts), but the picker was still
+    // listing them as if they were free, so picking one always failed with a
+    // confusing error. Map device_id -> the other pet's name so we can grey
+    // those entries out and explain why, instead of hiding them outright
+    // (hiding would make an already-assigned device just vanish from the
+    // list with no explanation). The pet being edited is excluded so its own
+    // current device still shows up as selectable.
+    val assignedElsewhere = remember(pets, petId) {
+        pets.filter { it.device_id != null && it.id != petId }
+            .associate { it.device_id!! to it.name }
+    }
 
     var name            by remember { mutableStateOf("") }
     var type            by remember { mutableStateOf("cat") }
@@ -43,9 +58,11 @@ fun AddEditPetScreen(
     var selectedDeviceId by remember { mutableStateOf<String?>(null) }
     var deviceMenuExpanded by remember { mutableStateOf(false) }
 
-    // Load the pet being edited and the current device list.
+    // Load the pet being edited, the full pet list (to know which feeders are
+    // already taken — see assignedElsewhere above), and the device list.
     LaunchedEffect(petId) {
         if (isEdit) viewModel.loadPet(petId!!)
+        viewModel.loadPets()
         deviceViewModel.refreshDevices()
     }
 
@@ -164,8 +181,21 @@ fun AddEditPetScreen(
                             onClick = { selectedDeviceId = null; deviceMenuExpanded = false },
                         )
                         devices.forEach { device ->
+                            val takenBy = assignedElsewhere[device.id]
                             DropdownMenuItem(
-                                text = { Text(device.name) },
+                                text = {
+                                    Column {
+                                        Text(device.name)
+                                        if (takenBy != null) {
+                                            Text(
+                                                "Already assigned to $takenBy",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    }
+                                },
+                                enabled = takenBy == null,
                                 onClick = { selectedDeviceId = device.id; deviceMenuExpanded = false },
                             )
                         }
