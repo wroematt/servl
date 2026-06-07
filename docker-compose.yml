@@ -28,6 +28,10 @@ services:
       dockerfile: website/Dockerfile
       args:
         NEXT_PUBLIC_API_URL: https://api.servl.uk
+        # Same Web Client ID as GOOGLE_CLIENT_ID below and Android's GOOGLE_WEB_CLIENT_ID —
+        # not a secret (it's already public in the Android APK and browser bundles); the
+        # backend verifies the ID token's audience against this same value.
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: 42503743783-4obce0mmlld9uog8unk8f8enh8f290ho.apps.googleusercontent.com
     container_name: pf_website
     restart: unless-stopped
     ports:

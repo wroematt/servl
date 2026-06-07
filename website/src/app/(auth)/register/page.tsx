@@ -1,10 +1,10 @@
 'use client';
 
+import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { api } from '@/lib/api';
 import { useAuth } from '@/providers/AuthProvider';
-import { IconBrandGoogle } from '@tabler/icons-react';
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -101,15 +101,10 @@ export default function RegisterPage() {
             <div className="flex-1 border-t border-border" />
           </div>
 
-          <div className="relative group">
-            <Button type="button" variant="secondary" className="w-full cursor-not-allowed opacity-60" disabled>
-              <IconBrandGoogle size={16} />
-              Continue with Google
-            </Button>
-            <span className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-text px-2 py-1 text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-              Coming soon
-            </span>
-          </div>
+          <GoogleSignInButton
+            onError={setError}
+            onSuccess={() => router.replace('/dashboard')}
+          />
 
           <p className="text-center text-xs text-text-tertiary">
             Already have an account?{' '}
