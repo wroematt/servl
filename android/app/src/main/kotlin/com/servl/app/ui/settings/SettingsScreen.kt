@@ -112,7 +112,7 @@ fun SettingsScreen(
             item {
                 ListItem(
                     headlineContent  = { Text("Notifications") },
-                    supportingContent = { Text("Hopper alerts, feed confirmations", color = TextSecondary) },
+                    supportingContent = { Text("Hopper, feed failure and overfeed alerts", color = TextSecondary) },
                     leadingContent   = { Icon(Icons.Default.Notifications, null) },
                     trailingContent  = { Icon(Icons.AutoMirrored.Filled.ArrowForward, null) },
                     modifier = Modifier.clickable {

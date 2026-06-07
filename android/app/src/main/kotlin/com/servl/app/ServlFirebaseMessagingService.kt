@@ -22,8 +22,8 @@ import kotlin.random.Random
  * Handles incoming FCM messages and token refresh events.
  *
  * On new token: sends the token to the backend via PATCH /users/me so the server
- * can target this device for push notifications (low-hopper alerts, feed confirmations,
- * feed failures, overfeed alerts).
+ * can target this device for push notifications (low-hopper alerts, feed failures,
+ * overfeed alerts).
  */
 @AndroidEntryPoint
 class ServlFirebaseMessagingService : FirebaseMessagingService() {
@@ -54,7 +54,7 @@ class ServlFirebaseMessagingService : FirebaseMessagingService() {
         // The backend sets android.notification.channel_id per alert type (see
         // notification-service/src/lib/fcm.ts) so each alert lands in the channel
         // the user configured — fall back to the default FCM channel if absent.
-        val channelId = notification.channelId ?: ServlApplication.CHANNEL_FEED_CONFIRMATIONS
+        val channelId = notification.channelId ?: ServlApplication.CHANNEL_HOPPER_ALERTS
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)

@@ -122,7 +122,9 @@ async function handleStatusMessage(deviceId: string, msg: MqttStatusPayload) {
       [msg.dispensed_g ?? 0, msg.command_id],
     );
 
-    // Notify the household that the meal was served, and check for overfeed
+    // Check for overfeed. (Note: we deliberately do NOT send a "meal served"
+    // confirmation notification here — with several scheduled meals a day,
+    // a push per dispense was reported as too frequent and annoying.)
     if (updated.rows.length > 0 && config.NOTIFICATION_SERVICE_URL) {
       const { pet_id, weight_dispensed_g } = updated.rows[0];
       const [deviceRow, petRow, todayRow] = await Promise.all([
@@ -147,13 +149,6 @@ async function handleStatusMessage(deviceId: string, msg: MqttStatusPayload) {
           household_id: deviceRow.rows[0].household_id,
           pet_name:     petRow.rows[0].name,
         };
-
-        // Feed confirmation notification
-        fetch(`${config.NOTIFICATION_SERVICE_URL}/internal/notify/feed`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...notifBase, weight_g: weight_dispensed_g }),
-        }).catch((err) => console.error('Feed notification error:', err));
 
         // Overfeed notification — fires exactly once when the daily total first
         // crosses the target (previous total was within budget, now over it).

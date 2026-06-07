@@ -30,16 +30,6 @@ class ServlApplication : Application() {
 
             manager.createNotificationChannel(
                 NotificationChannel(
-                    CHANNEL_FEED_CONFIRMATIONS,
-                    "Feed Confirmations",
-                    NotificationManager.IMPORTANCE_DEFAULT,
-                ).apply {
-                    description = "Confirmation when a meal has been dispensed"
-                }
-            )
-
-            manager.createNotificationChannel(
-                NotificationChannel(
                     CHANNEL_FEED_FAILED,
                     "Feed Failures",
                     NotificationManager.IMPORTANCE_HIGH,
@@ -62,7 +52,6 @@ class ServlApplication : Application() {
 
     companion object {
         const val CHANNEL_HOPPER_ALERTS      = "hopper_alerts"
-        const val CHANNEL_FEED_CONFIRMATIONS = "feed_confirmations"
         const val CHANNEL_FEED_FAILED        = "feed_failed"
         const val CHANNEL_OVERFEED           = "overfeed_alerts"
     }
