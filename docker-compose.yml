@@ -143,6 +143,13 @@ services:
       - MQTT_INTERNAL_USER=${MQTT_INTERNAL_USER}
       - MQTT_INTERNAL_PASS=${MQTT_INTERNAL_PASS}
       - NOTIFICATION_SERVICE_URL=http://notification-service:3004
+      # Used to hand off physical Meal/Snack button presses (feeder/{id}/button
+      # MQTT topic — see TaskList #10): device-service resolves the device to
+      # its assigned pet's feed weight via feed-service's internal dispense flow,
+      # the same one /feed/meal and /feed/snack use, so button-triggered feeds
+      # go through identical validation, concurrency-guarding, and MQTT
+      # confirmation as app-triggered ones.
+      - FEED_SERVICE_URL=http://feed-service:3005
       # URL that ESP32 devices can reach for OTA firmware downloads.
       # NOTE: this was originally a home-LAN IP (the backend ran on a Pi on
       # the same network as the devices). Now that the backend runs on an

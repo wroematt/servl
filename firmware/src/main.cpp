@@ -10,6 +10,7 @@
 #include "dispenser.h"
 #include "stepper.h"
 #include "scale.h"
+#include "buttons.h"
 #include "led_status.h"
 
 // ─── Application states ───────────────────────────────────────────────────────
@@ -48,6 +49,7 @@ void setup() {
 
     stepper_init();
     scale_init();
+    buttons_init();
     dispenser_reset_hopper();
 
     log_i("[main] Servl firmware v%s booting...", FIRMWARE_VERSION);
@@ -284,6 +286,21 @@ static void handle_operational() {
         log_i("[main] Dispense command received — moving to DISPENSING");
         s_state = AppState::DISPENSING;
         led_status_set(LedState::DISPENSING);  // fast blink — auger motor running
+    }
+
+    // Check the physical Meal/Snack buttons for a qualifying double-click (see
+    // TaskList #10 — single presses are deliberately ignored "to make it
+    // difficult for a pet to learn"). Only polled while OPERATIONAL: that's
+    // the only state where the request could actually be published anywhere,
+    // and it keeps provisioning/connecting states free of unrelated GPIO work.
+    // This is fire-and-forget — the resulting feed (if any) arrives back as an
+    // ordinary MQTT dispense command, exactly like an app- or schedule-triggered
+    // one, and is handled by the existing g_commandPending path above.
+    ButtonId pressed;
+    if (buttons_poll(&pressed)) {
+        const char* feedType = (pressed == ButtonId::MEAL) ? "meal" : "snack";
+        log_i("[main] %s button double-clicked — requesting feed", feedType);
+        mqtt_publish_button_press(feedType);
     }
 }
 

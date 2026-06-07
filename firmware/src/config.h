@@ -22,6 +22,13 @@ constexpr uint8_t PIN_STEPPER_ENABLE = 33;
 constexpr uint8_t PIN_SCALE_DOUT = 4;
 constexpr uint8_t PIN_SCALE_SCK  = 16;
 
+// Physical Meal / Snack feed buttons (see TaskList #10 — "two buttons on the
+// device will act as Meal and Snack feed buttons"). Wired active-LOW with
+// internal pull-ups, exactly like PIN_BUTTON (BOOT). GPIO32 and GPIO13 are
+// free of any other on-board role and are not boot-strapping pins.
+constexpr uint8_t PIN_BUTTON_MEAL  = 32;
+constexpr uint8_t PIN_BUTTON_SNACK = 13;
+
 // ─── Timing ──────────────────────────────────────────────────────────────────
 // BOOT button hold gestures (two tiers — see check_factory_reset() in
 // main.cpp). Held between CALIBRATE_HOLD_MS and RESET_HOLD_MS: recalibrate
@@ -32,6 +39,21 @@ constexpr uint8_t PIN_SCALE_SCK  = 16;
 // and let go before crossing into factory-reset territory by mistake.
 constexpr uint32_t CALIBRATE_HOLD_MS = 1200;
 constexpr uint32_t RESET_HOLD_MS     = 3000;
+
+// Meal/Snack button gesture timing (see buttons.h). "To trigger a feed the
+// button must be double clicked to make it difficult for a pet to learn" —
+// a single press does nothing; only two presses landing inside the window
+// below count as a feed request.
+//
+// BUTTON_DEBOUNCE_MS: raw reads must be stable for this long before a level
+// change is accepted as a real press/release (filters mechanical contact
+// bounce — without it a single physical press can register as several).
+//
+// DOUBLE_CLICK_WINDOW_MS: maximum gap between the first and second press.
+// Wide enough for a deliberate human double-tap, narrow enough that a pet
+// idly pawing at the button is unlikely to land two presses inside it by chance.
+constexpr uint32_t BUTTON_DEBOUNCE_MS     = 40;
+constexpr uint32_t DOUBLE_CLICK_WINDOW_MS = 400;
 
 // How often the device publishes a heartbeat status message while operational.
 constexpr uint32_t HEARTBEAT_INTERVAL_MS = 30000;
@@ -120,7 +142,7 @@ constexpr uint32_t MQTT_CONNECT_TIMEOUT_MS =  8000;
 constexpr int MQTT_MAX_PACKET = 1024;
 
 // ─── Firmware identity ───────────────────────────────────────────────────────
-constexpr char FIRMWARE_VERSION[] = "1.5.0";
+constexpr char FIRMWARE_VERSION[] = "1.6.0";
 
 // BLE device name prefix — last 4 hex digits of MAC are appended at runtime
 // so multiple units can be distinguished (e.g. "Servl-A1B2").

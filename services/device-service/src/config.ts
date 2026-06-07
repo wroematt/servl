@@ -7,6 +7,12 @@ const schema = z.object({
   MQTT_INTERNAL_USER: z.string(),
   MQTT_INTERNAL_PASS: z.string(),
   NOTIFICATION_SERVICE_URL: z.string().optional(),
+  // Used to forward physical Meal/Snack button presses (feeder/{id}/button —
+  // see TaskList #10) into the normal dispense flow via feed-service's
+  // internal /internal/button-press route — the same createDispense() path
+  // /feed/meal and /feed/snack use, so button-triggered feeds get identical
+  // validation, concurrency-guarding, and MQTT confirmation.
+  FEED_SERVICE_URL: z.string().optional(),
   // Base URL that ESP32 devices (on the user's home LAN) can reach to download
   // firmware binaries. The backend now runs on an Oracle Cloud server — not on
   // the same LAN as the devices — so in production this must be a publicly

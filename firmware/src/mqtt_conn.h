@@ -48,3 +48,15 @@ void mqtt_publish_status(const char* command_id,
                          int         hopper_pct,
                          const char* status,             // "ok" | "error" | "low_hopper"
                          const char* error_message = nullptr);
+
+// ─── Physical Meal/Snack button presses (see TaskList #10) ──────────────────
+// Publish a button-press request to feeder/{deviceId}/button:
+//   { "feed_type": "meal" | "snack" }
+// feed_type must be exactly "meal" or "snack". Fire-and-forget — the device
+// has no way to know which pet it feeds, the portion size, or whether a feed
+// is already in progress (see services/feed-service /internal/button-press,
+// which resolves all of that and runs the request through the normal
+// createDispense() path). This call simply reports the gesture and returns;
+// the resulting dispense — if any — arrives back as an ordinary MQTT command
+// on feeder/{deviceId}/cmd, same as an app- or schedule-triggered feed.
+void mqtt_publish_button_press(const char* feed_type);

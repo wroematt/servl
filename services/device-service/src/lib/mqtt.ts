@@ -18,12 +18,22 @@ export function connectMqtt() {
     client.subscribe('feeder/+/status', { qos: 1 }, (err) => {
       if (err) console.error('MQTT subscribe error:', err);
     });
+    // Physical Meal/Snack button presses (double-click — see TaskList #10).
+    // Published by the device itself, not the broker's status pipeline, since
+    // it's a request *to* the server rather than telemetry *from* the device.
+    client.subscribe('feeder/+/button', { qos: 1 }, (err) => {
+      if (err) console.error('MQTT subscribe error (button):', err);
+    });
   });
 
   client.on('message', async (topic, payload) => {
     try {
+      const [, deviceId, topicType] = topic.split('/');
+      if (topicType === 'button') {
+        await handleButtonPress(deviceId, JSON.parse(payload.toString()));
+        return;
+      }
       const msg = JSON.parse(payload.toString()) as MqttStatusPayload;
-      const deviceId = topic.split('/')[1];
       await handleStatusMessage(deviceId, msg);
     } catch (err) {
       console.error('MQTT message handling error:', err);
@@ -39,6 +49,45 @@ export function publishCommand(deviceId: string, payload: MqttCommandPayload) {
     throw new Error('MQTT client not connected');
   }
   client.publish(`feeder/${deviceId}/cmd`, JSON.stringify(payload), { qos: 1 });
+}
+
+// ── Physical Meal/Snack button presses ────────────────────────────────────
+// Published by the firmware to feeder/{deviceId}/button on a double-click
+// (see TaskList #10): { "feed_type": "meal" | "snack" }. The device only
+// knows its own ID — not which pet it feeds, the portion size, or whether a
+// feed is already in flight — so we hand off to feed-service's internal
+// /internal/button-press route, which resolves the pet and runs the request
+// through the exact same createDispense() path /feed/meal and /feed/snack
+// use (same validation, same one-pending-feed-per-pet guard, same MQTT
+// confirmation loop). This keeps "device service is the only service that
+// publishes commands" intact — feed-service still never touches MQTT
+// directly; it calls back into device-service's /internal/command exactly as
+// it does for app-triggered feeds.
+async function handleButtonPress(deviceId: string, msg: { feed_type?: string }) {
+  if (msg.feed_type !== 'meal' && msg.feed_type !== 'snack') {
+    console.warn(`[mqtt] Ignoring malformed button press from device ${deviceId}:`, msg);
+    return;
+  }
+
+  console.log(`[mqtt] Button press: device=${deviceId} feed_type=${msg.feed_type}`);
+
+  if (!config.FEED_SERVICE_URL) {
+    console.error('[mqtt] Cannot handle button press — FEED_SERVICE_URL not configured');
+    return;
+  }
+
+  try {
+    const response = await fetch(`${config.FEED_SERVICE_URL}/internal/button-press`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device_id: deviceId, feed_type: msg.feed_type }),
+    });
+    if (!response.ok) {
+      console.error(`[mqtt] Button-press dispense request failed for device ${deviceId}: HTTP ${response.status}`);
+    }
+  } catch (err) {
+    console.error(`[mqtt] Button-press dispense request error for device ${deviceId}:`, err);
+  }
 }
 
 async function handleStatusMessage(deviceId: string, msg: MqttStatusPayload) {

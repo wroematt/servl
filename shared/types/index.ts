@@ -8,7 +8,7 @@
 export type Role = 'owner' | 'member';
 export type PetType = 'cat' | 'dog';
 export type FeedType = 'meal' | 'snack' | 'custom';
-export type TriggerType = 'manual' | 'schedule' | 'voice' | 'api';
+export type TriggerType = 'manual' | 'schedule' | 'voice' | 'api' | 'button';
 export type FeedStatus = 'pending' | 'confirmed' | 'failed' | 'timeout';
 export type DeviceStatus = 'online' | 'offline' | 'error';
 export type DeviceEventType =

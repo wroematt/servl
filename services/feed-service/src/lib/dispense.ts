@@ -6,7 +6,7 @@ interface DispenseOptions {
   petId: string;
   deviceId: string;
   weightG: number;
-  triggerType: 'manual' | 'schedule' | 'voice' | 'api';
+  triggerType: 'manual' | 'schedule' | 'voice' | 'api' | 'button';
   triggeredBy?: string | null;
   scheduleId?: string | null;
 }

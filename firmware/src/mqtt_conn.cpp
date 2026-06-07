@@ -23,6 +23,7 @@ static PubSubClient  s_mqtt(s_wifiClient);
 // Topic strings built from the device UUID during mqtt_connect().
 static String s_cmdTopic;
 static String s_statusTopic;
+static String s_buttonTopic;
 
 // ─── Message callback ─────────────────────────────────────────────────────────
 static void onMessage(const char* topic, uint8_t* payload, unsigned int length) {
@@ -108,6 +109,7 @@ bool mqtt_connect(const Credentials& creds) {
 
     s_cmdTopic    = "feeder/" + deviceId + "/cmd";
     s_statusTopic = "feeder/" + deviceId + "/status";
+    s_buttonTopic = "feeder/" + deviceId + "/button";
 
     log_i("[mqtt] Connecting to %s:%d as %s", creds.mqtt_broker, creds.mqtt_port, creds.mqtt_client_id);
 
@@ -182,5 +184,24 @@ void mqtt_publish_status(const char* command_id,
         log_i("[mqtt] Published status: %s", buf);
     } else {
         log_e("[mqtt] Publish failed");
+    }
+}
+
+void mqtt_publish_button_press(const char* feed_type) {
+    if (!s_mqtt.connected()) {
+        log_w("[mqtt] Cannot publish button press — not connected");
+        return;
+    }
+
+    JsonDocument doc;
+    doc["feed_type"] = feed_type;
+
+    char buf[64];
+    size_t n = serializeJson(doc, buf, sizeof(buf));
+
+    if (s_mqtt.publish(s_buttonTopic.c_str(), (uint8_t*)buf, n, /*retain=*/false)) {
+        log_i("[mqtt] Published button press: %s", buf);
+    } else {
+        log_e("[mqtt] Button press publish failed");
     }
 }
