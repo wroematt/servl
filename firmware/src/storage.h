@@ -24,5 +24,27 @@ void storage_save(const Credentials& c);
 // Read credentials from NVS.  Call storage_has_credentials() first.
 Credentials storage_load();
 
-// Erase all credential keys from NVS (factory reset).
+// ─── Hopper scale calibration ────────────────────────────────────────────────
+// The HX711 reports raw ADC counts relative to an internal "offset" set by
+// tare() — we tare against the EMPTY hopper and persist that raw offset here,
+// so "0 g" always means "empty hopper" and stays comparable across reboots
+// without physically emptying the hopper every time the device restarts.
+// See scale.h for how this is used and scale_recalibrate_empty() for how it
+// gets (re-)established when the baseline drifts over days/weeks.
+
+// Returns true if an empty-hopper baseline offset has been persisted.
+bool storage_has_scale_offset();
+
+// Persist the HX711 raw tare offset representing "hopper empty". Overwrites
+// any existing value.
+void storage_save_scale_offset(long offset);
+
+// Read the persisted offset. Returns 0 if none has been saved — callers
+// should check storage_has_scale_offset() first (0 is a perfectly valid raw
+// offset, not a sentinel).
+long storage_load_scale_offset();
+
+// Erase all persisted state from NVS — credentials AND the scale calibration
+// offset (factory reset / re-provisioning a relocated unit should not inherit
+// a stale baseline from its previous home).
 void storage_clear();

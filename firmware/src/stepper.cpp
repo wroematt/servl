@@ -53,6 +53,32 @@ void stepper_move(long steps, void (*onTick)()) {
     }
 }
 
+void stepper_run_until(bool (*poll)()) {
+    enable_driver();
+
+    // Constant-speed "free run" — no target distance, since we don't know in
+    // advance how far we'll need to go (that's the whole point of closed-loop
+    // weight feedback). setSpeed()+runSpeed() is AccelStepper's API for this,
+    // as distinct from move()+run() which ramps toward a fixed target.
+    s_stepper.setSpeed(STEPPER_DISPENSE_SPEED_STEPS_PER_SEC);
+
+    uint32_t lastPoll = millis();
+    while (true) {
+        // Must be called as close to continuously as possible — same
+        // requirement as run() in stepper_move() above; this is what actually
+        // emits the STEP pulses on schedule.
+        s_stepper.runSpeed();
+
+        if (poll) {
+            uint32_t now = millis();
+            if (now - lastPoll >= DISPENSE_POLL_INTERVAL_MS) {
+                lastPoll = now;
+                if (poll()) break;
+            }
+        }
+    }
+}
+
 void stepper_disable() {
     digitalWrite(PIN_STEPPER_ENABLE, HIGH);
     s_enabled = false;

@@ -40,7 +40,11 @@ void mqtt_loop();
 
 // Publish a status message to feeder/{deviceId}/status.
 // Pass command_id = nullptr and dispensed_g = -1 for a plain heartbeat.
+// error_message is optional (default nullptr) — set it when status == "error"
+// and there's a human-readable reason worth surfacing; device-service logs it
+// into the device's event log (see services/device-service/src/lib/mqtt.ts).
 void mqtt_publish_status(const char* command_id,
                          int         dispensed_g,
                          int         hopper_pct,
-                         const char* status);   // "ok" | "error" | "low_hopper"
+                         const char* status,             // "ok" | "error" | "low_hopper"
+                         const char* error_message = nullptr);

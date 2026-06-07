@@ -158,20 +158,24 @@ void mqtt_loop() {
 void mqtt_publish_status(const char* command_id,
                          int         dispensed_g,
                          int         hopper_pct,
-                         const char* status) {
+                         const char* status,
+                         const char* error_message) {
     if (!s_mqtt.connected()) {
         log_w("[mqtt] Cannot publish — not connected");
         return;
     }
 
     JsonDocument doc;
-    if (command_id != nullptr) doc["command_id"] = command_id;
-    if (dispensed_g >= 0)      doc["dispensed_g"] = dispensed_g;
+    if (command_id != nullptr)    doc["command_id"]   = command_id;
+    if (dispensed_g >= 0)         doc["dispensed_g"]  = dispensed_g;
+    if (error_message != nullptr) doc["error_message"] = error_message;
     doc["hopper_pct"]       = hopper_pct;
     doc["status"]           = status;
     doc["firmware_version"] = FIRMWARE_VERSION;
 
-    char buf[256];
+    // Larger than the other payloads in this file — error_message can add a
+    // meaningful number of bytes on top of the usual fields.
+    char buf[384];
     size_t n = serializeJson(doc, buf, sizeof(buf));
 
     if (s_mqtt.publish(s_statusTopic.c_str(), (uint8_t*)buf, n, /*retain=*/false)) {

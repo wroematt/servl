@@ -9,6 +9,7 @@
 #include "mqtt_conn.h"
 #include "dispenser.h"
 #include "stepper.h"
+#include "scale.h"
 #include "led_status.h"
 
 // ─── Application states ───────────────────────────────────────────────────────
@@ -21,10 +22,11 @@ enum class AppState {
     UPDATING,           // Downloading + flashing OTA firmware update
 };
 
-static AppState      s_state       = AppState::PROVISIONING_BLE;
-static Credentials   s_creds       = {};
-static uint32_t      s_heartbeatAt = 0;
-static uint32_t      s_btnPressAt  = 0;
+static AppState      s_state          = AppState::PROVISIONING_BLE;
+static Credentials   s_creds          = {};
+static uint32_t      s_heartbeatAt    = 0;
+static uint32_t      s_btnPressAt     = 0;
+static bool          s_calibrateFired = false;   // guards the recalibration hold-tier firing more than once per press
 
 // ─── Forward declarations ─────────────────────────────────────────────────────
 static void handle_provisioning_ble();
@@ -45,6 +47,7 @@ void setup() {
     digitalWrite(PIN_LED, LOW);
 
     stepper_init();
+    scale_init();
     dispenser_reset_hopper();
 
     log_i("[main] Servl firmware v%s booting...", FIRMWARE_VERSION);
@@ -78,12 +81,39 @@ void loop() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Factory reset: hold BOOT button for RESET_HOLD_MS
+// BOOT button hold gestures — two tiers (see CALIBRATE_HOLD_MS / RESET_HOLD_MS
+// in config.h):
+//   short hold  → recalibrate the empty-hopper scale baseline (hopper MUST be
+//                 empty — see scale_recalibrate_empty())
+//   long hold   → factory reset: erase credentials, reboot into provisioning
 // ─────────────────────────────────────────────────────────────────────────────
 static void check_factory_reset() {
     if (digitalRead(PIN_BUTTON) == LOW) {
-        if (s_btnPressAt == 0) s_btnPressAt = millis();
-        if (millis() - s_btnPressAt >= RESET_HOLD_MS) {
+        if (s_btnPressAt == 0) {
+            s_btnPressAt     = millis();
+            s_calibrateFired = false;
+        }
+        uint32_t held = millis() - s_btnPressAt;
+
+        // Tier 1: empty-hopper recalibration. Fires once per press — guarded
+        // so it doesn't repeat on every loop() iteration while held past this
+        // threshold, and so it stays a one-shot even if the hold continues on
+        // into factory-reset territory.
+        if (!s_calibrateFired && held >= CALIBRATE_HOLD_MS && held < RESET_HOLD_MS) {
+            s_calibrateFired = true;
+            log_w("[main] Empty-hopper recalibration triggered (BOOT held %lu ms)", (unsigned long)held);
+            // Two short flashes = "calibrating" — visually distinct from the
+            // five-flash factory-reset confirmation below.
+            for (int i = 0; i < 2; i++) {
+                digitalWrite(PIN_LED, HIGH); delay(150);
+                digitalWrite(PIN_LED, LOW);  delay(150);
+            }
+            scale_recalibrate_empty();
+            dispenser_reset_hopper();   // refresh the %-full estimate against the new baseline
+        }
+
+        // Tier 2: factory reset (existing behaviour, unchanged threshold).
+        if (held >= RESET_HOLD_MS) {
             log_w("[main] Factory reset triggered — erasing credentials and rebooting");
             // Flash LED rapidly 5× to give visible feedback
             for (int i = 0; i < 5; i++) {
@@ -94,7 +124,8 @@ static void check_factory_reset() {
             esp_restart();
         }
     } else {
-        s_btnPressAt = 0;
+        s_btnPressAt     = 0;
+        s_calibrateFired = false;
     }
 }
 
@@ -171,10 +202,9 @@ static void handle_mqtt_connecting() {
     if (mqtt_connect(s_creds)) {
         log_i("[main] MQTT connected — moving to OPERATIONAL");
 
-        // Publish initial heartbeat. hopper_pct is currently an open-loop estimate
-        // with no persistence (see dispenser.h TODO) — it always reads 100 on
-        // boot/reconnect, regardless of what it was before a power-cycle, until
-        // the load-cell hopper scale (TaskList #9) provides a real measurement.
+        // Publish initial heartbeat with a fresh hopper reading from the scale
+        // (a real measurement now — see dispenser_reset_hopper() / scale.h).
+        dispenser_reset_hopper();
         mqtt_publish_status(nullptr, -1, dispenser_get_hopper_pct(), "ok");
         s_heartbeatAt = millis() + HEARTBEAT_INTERVAL_MS;
 
@@ -219,8 +249,11 @@ static void handle_operational() {
 
     mqtt_loop();  // process incoming messages + keepalive
 
-    // Periodic heartbeat
+    // Periodic heartbeat — take a fresh scale reading first so hopper_pct
+    // reflects reality even between dispenses (e.g. the user topping up the
+    // hopper shows up within one heartbeat interval, not just after a feed).
     if (millis() >= s_heartbeatAt) {
+        dispenser_reset_hopper();
         mqtt_publish_status(nullptr, -1, dispenser_get_hopper_pct(), "ok");
         s_heartbeatAt = millis() + HEARTBEAT_INTERVAL_MS;
     }
@@ -266,14 +299,26 @@ static void handle_dispensing() {
 
     log_i("[main] DISPENSING %dg  command_id: %s", cmd.weight_g, cmd.command_id);
 
-    // dispenser_run() drives the stepper motor (see stepper.cpp) and pumps
+    // dispenser_run() drives the stepper motor under closed-loop weight
+    // feedback from the hopper scale (see scale.h / dispenser.cpp) and pumps
     // mqtt_loop() periodically to keep the connection alive during the rotation.
     dispenser_run(cmd.weight_g);
 
-    int hopper = dispenser_get_hopper_pct();
+    int  hopper   = dispenser_get_hopper_pct();
+    int  measured = dispenser_get_last_dispensed_g();
+    bool ok       = dispenser_last_run_ok();
 
-    // Publish confirmation.
-    mqtt_publish_status(cmd.command_id, cmd.weight_g, hopper, "ok");
+    // Report the *measured* amount — not the requested amount — so
+    // feed_events.weight_dispensed_g reflects what the closed-loop scale
+    // feedback actually observed (see CLAUDE.md MQTT confirmation-loop
+    // rationale: this is precisely what surfaces a short dispense to the user).
+    if (ok) {
+        mqtt_publish_status(cmd.command_id, measured, hopper, "ok");
+    } else {
+        mqtt_publish_status(cmd.command_id, measured, hopper, "error",
+                            "Dispense timed out before reaching the target weight "
+                            "— check the hopper, auger, and scale calibration");
+    }
 
     // If hopper just went below 20%, send an explicit low_hopper notification.
     if (hopper < 20) {

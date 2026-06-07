@@ -52,10 +52,35 @@ Credentials storage_load() {
     return c;
 }
 
+// ─── Hopper scale calibration ────────────────────────────────────────────────
+bool storage_has_scale_offset() {
+    Preferences prefs;
+    prefs.begin(NVS_NS, /*readOnly=*/true);
+    bool has = prefs.isKey("scale_off");
+    prefs.end();
+    return has;
+}
+
+void storage_save_scale_offset(long offset) {
+    Preferences prefs;
+    prefs.begin(NVS_NS, /*readOnly=*/false);
+    prefs.putLong("scale_off", offset);
+    prefs.end();
+    log_i("[storage] Empty-hopper scale offset saved: %ld", offset);
+}
+
+long storage_load_scale_offset() {
+    Preferences prefs;
+    prefs.begin(NVS_NS, /*readOnly=*/true);
+    long offset = prefs.getLong("scale_off", 0);
+    prefs.end();
+    return offset;
+}
+
 void storage_clear() {
     Preferences prefs;
     prefs.begin(NVS_NS, /*readOnly=*/false);
     prefs.clear();
     prefs.end();
-    log_i("[storage] Credentials erased");
+    log_i("[storage] Credentials and scale calibration erased");
 }
