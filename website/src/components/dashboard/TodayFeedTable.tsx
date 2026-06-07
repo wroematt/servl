@@ -42,7 +42,7 @@ export function TodayFeedTable({ events, loading, petNames }: TodayFeedTableProp
               {events.map((ev) => (
                 <tr key={ev.id} className="border-b border-border last:border-0">
                   <td className="py-2 font-mono text-text-secondary">
-                    {formatDateTime(ev.created_at)}
+                    {formatDateTime(ev.dispensed_at)}
                   </td>
                   <td className="py-2 text-text">
                     {petNames[ev.pet_id] ?? '—'}

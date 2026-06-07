@@ -75,7 +75,9 @@ export interface FeedEvent {
   weight_dispensed_g: number | null;
   trigger_type: 'manual' | 'schedule' | 'voice' | 'api';
   status: 'pending' | 'confirmed' | 'failed' | 'timeout';
-  created_at: string;
+  // The DB column (and the API response) is `dispensed_at` — the timestamp of
+  // the actual dispense, not a generic row-creation timestamp.
+  dispensed_at: string;
 }
 
 export function useFeedHistory(

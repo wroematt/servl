@@ -200,7 +200,7 @@ export default function PetDetailPage({ params }: { params: { petId: string } })
                   {feedData!.data.map((ev) => (
                     <tr key={ev.id} className="border-b border-border last:border-0">
                       <td className="py-2 font-mono text-text-secondary">
-                        {formatDateTime(ev.created_at)}
+                        {formatDateTime(ev.dispensed_at)}
                       </td>
                       <td className="py-2">
                         <TriggerBadge type={ev.trigger_type} />
