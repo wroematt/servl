@@ -25,7 +25,11 @@ petsRouter.get('/', async (req: Request, res: Response) => {
          SUM(fe.weight_dispensed_g)
            FILTER (WHERE fe.dispensed_at >= CURRENT_DATE AND fe.status = 'confirmed'),
          0
-       ) AS today_intake_g
+       ) AS today_intake_g,
+       EXISTS (
+         SELECT 1 FROM feed_events pfe
+         WHERE pfe.pet_id = p.id AND pfe.status = 'pending'
+       ) AS has_pending_feed
      FROM pets p
      LEFT JOIN devices d ON d.id = p.device_id
      LEFT JOIN feed_events fe ON fe.pet_id = p.id
@@ -76,7 +80,11 @@ petsRouter.get('/:petId', async (req: Request, res: Response) => {
          SUM(fe.weight_dispensed_g)
            FILTER (WHERE fe.dispensed_at >= CURRENT_DATE AND fe.status = 'confirmed'),
          0
-       ) AS today_intake_g
+       ) AS today_intake_g,
+       EXISTS (
+         SELECT 1 FROM feed_events pfe
+         WHERE pfe.pet_id = p.id AND pfe.status = 'pending'
+       ) AS has_pending_feed
      FROM pets p
      LEFT JOIN devices d ON d.id = p.device_id
      LEFT JOIN feed_events fe ON fe.pet_id = p.id

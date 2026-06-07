@@ -105,8 +105,8 @@ export default function PetDetailPage({ params }: { params: { petId: string } })
               <div className="flex gap-2">
                 {pet.device_id && (
                   <>
-                    <FeedButton petId={pet.id} type="meal" />
-                    <FeedButton petId={pet.id} type="snack" />
+                    <FeedButton petId={pet.id} type="meal" pending={pet.has_pending_feed} />
+                    <FeedButton petId={pet.id} type="snack" pending={pet.has_pending_feed} />
                   </>
                 )}
                 <Button

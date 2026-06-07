@@ -9,6 +9,7 @@ import com.servl.app.data.network.dto.PetStatsDto
 import com.servl.app.data.repository.FeedRepository
 import com.servl.app.data.repository.PetRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -56,8 +57,26 @@ class PetViewModel @Inject constructor(
     }
 
     fun loadPet(petId: String) {
-        viewModelScope.launch {
-            try { _selectedPet.value = petRepository.getPet(petId) } catch (e: Exception) { _error.value = e.message }
+        viewModelScope.launch { fetchPet(petId) }
+    }
+
+    /** Suspending fetch — shared by [loadPet] and [pollPendingFeed] so the latter can await each refresh. */
+    private suspend fun fetchPet(petId: String) {
+        try { _selectedPet.value = petRepository.getPet(petId) } catch (e: Exception) { _error.value = e.message }
+    }
+
+    /**
+     * Polls the pet endpoint every 4s while its feed is still 'pending', so the
+     * Meal/Snack buttons re-enable promptly once the device confirms — or once
+     * the worker's 30s timeout sweep flips the stuck feed_event to 'timeout'.
+     * Capped at 10 attempts (~40s), comfortably past the 30s timeout, so a
+     * persistently-stuck state doesn't poll forever.
+     */
+    private suspend fun pollPendingFeed(petId: String) {
+        repeat(10) {
+            delay(4_000)
+            fetchPet(petId)
+            if (_selectedPet.value?.has_pending_feed != true) return
         }
     }
 
@@ -117,8 +136,8 @@ class PetViewModel @Inject constructor(
         }
     }
 
-    fun feedMeal(petId: String)  { viewModelScope.launch { try { feedRepository.feedMeal(petId);  loadPet(petId) } catch (e: Exception) { _error.value = e.message } } }
-    fun feedSnack(petId: String) { viewModelScope.launch { try { feedRepository.feedSnack(petId); loadPet(petId) } catch (e: Exception) { _error.value = e.message } } }
+    fun feedMeal(petId: String)  { viewModelScope.launch { try { feedRepository.feedMeal(petId);  fetchPet(petId); pollPendingFeed(petId) } catch (e: Exception) { _error.value = e.message } } }
+    fun feedSnack(petId: String) { viewModelScope.launch { try { feedRepository.feedSnack(petId); fetchPet(petId); pollPendingFeed(petId) } catch (e: Exception) { _error.value = e.message } } }
 
     fun clearError() { _error.value = null }
 }

@@ -86,8 +86,8 @@ export function PetCard({ pet }: PetCardProps) {
         {/* Feed buttons */}
         {pet.device_id ? (
           <div className="flex gap-2">
-            <FeedButton petId={pet.id} type="meal" />
-            <FeedButton petId={pet.id} type="snack" />
+            <FeedButton petId={pet.id} type="meal" pending={pet.has_pending_feed} />
+            <FeedButton petId={pet.id} type="snack" pending={pet.has_pending_feed} />
           </div>
         ) : (
           <p className="text-xs text-text-tertiary">No device assigned</p>

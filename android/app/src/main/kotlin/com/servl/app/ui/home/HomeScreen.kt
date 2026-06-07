@@ -136,7 +136,7 @@ fun HomeScreen(
                                 // Filled meal button
                                 Button(
                                     onClick = { viewModel.feedMeal(pet.id) },
-                                    enabled = pet.device_id != null,
+                                    enabled = pet.device_id != null && !pet.has_pending_feed,
                                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                                     modifier = Modifier.height(36.dp),
                                 ) {
@@ -148,7 +148,7 @@ fun HomeScreen(
                                 // Outlined snack button
                                 OutlinedButton(
                                     onClick = { viewModel.feedSnack(pet.id) },
-                                    enabled = pet.device_id != null,
+                                    enabled = pet.device_id != null && !pet.has_pending_feed,
                                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                                     modifier = Modifier.height(36.dp),
                                 ) {

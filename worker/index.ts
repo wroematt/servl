@@ -80,6 +80,34 @@ new CronJob('* * * * *', async () => {
   }
 }, null, true);
 
+// ── Cron: sweep stale 'pending' feed events into 'timeout' ────
+//
+// A feed_event is created as 'pending' and stays that way until device-service
+// receives an MQTT confirmation and flips it to 'confirmed' or 'failed'. If the
+// device is offline, drops the command, or never publishes a status message,
+// nothing would ever move that row out of 'pending' — and since migration 005
+// allows at most one 'pending' feed_event per pet, a stuck row would
+// permanently block that pet from being fed again (and the app/website would
+// show its Meal/Snack buttons disabled forever).
+//
+// This sweep runs every 10s and times out any 'pending' row older than the
+// documented 30s confirmation window (see CLAUDE.md "Scheduled feeds").
+new CronJob('*/10 * * * * *', async () => {
+  try {
+    const { rows } = await db.query(`
+      UPDATE feed_events
+      SET status = 'timeout'
+      WHERE status = 'pending' AND dispensed_at < NOW() - INTERVAL '30 seconds'
+      RETURNING id, pet_id, device_id
+    `);
+    for (const row of rows) {
+      console.log(`[timeout-sweep] feed_event ${row.id} (pet ${row.pet_id}, device ${row.device_id}) timed out — no device confirmation within 30s`);
+    }
+  } catch (err) {
+    console.error('[timeout-sweep] error:', err);
+  }
+}, null, true);
+
 // ── Worker: process feed jobs ─────────────────
 
 const feedWorker = new Worker('feed-jobs', async (job: Job) => {

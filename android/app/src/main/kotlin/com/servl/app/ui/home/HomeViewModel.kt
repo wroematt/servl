@@ -10,6 +10,7 @@ import com.servl.app.data.repository.FeedRepository
 import com.servl.app.data.repository.PetRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -72,6 +73,7 @@ class HomeViewModel @Inject constructor(
             try {
                 feedRepository.feedMeal(petId)
                 load() // refresh feed list
+                pollPendingFeed(petId)
             } catch (e: Exception) {
                 _feedError.value = e.message ?: "Feed failed"
             }
@@ -84,9 +86,34 @@ class HomeViewModel @Inject constructor(
             try {
                 feedRepository.feedSnack(petId)
                 load()
+                pollPendingFeed(petId)
             } catch (e: Exception) {
                 _feedError.value = e.message ?: "Feed failed"
             }
+        }
+    }
+
+    /**
+     * Lightweight suspend refresh of just the pets list (skips devices + today's
+     * feeds that [load] also fetches) — keeps the poll cheap since all we need
+     * is each pet's up-to-date `has_pending_feed` flag.
+     */
+    private suspend fun fetchPets() {
+        try { _pets.value = petRepository.getPets() } catch (_: Exception) { }
+    }
+
+    /**
+     * Polls the pets list every 4s while the just-fed pet still shows a pending
+     * feed, so its Meal/Snack buttons re-enable promptly once the device
+     * confirms — or once the worker's 30s timeout sweep flips the stuck
+     * feed_event to 'timeout'. Capped at 10 attempts (~40s), comfortably past
+     * the 30s timeout, so a persistently-stuck state doesn't poll forever.
+     */
+    private suspend fun pollPendingFeed(petId: String) {
+        repeat(10) {
+            delay(4_000)
+            fetchPets()
+            if (_pets.value.find { it.id == petId }?.has_pending_feed != true) return
         }
     }
 

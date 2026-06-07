@@ -54,8 +54,8 @@ export function QuickFeedPanel({ pets, loading }: QuickFeedPanelProps) {
                 </div>
                 {pet.device_id ? (
                   <div className="flex gap-1.5">
-                    <FeedButton petId={pet.id} type="meal" />
-                    <FeedButton petId={pet.id} type="snack" />
+                    <FeedButton petId={pet.id} type="meal" pending={pet.has_pending_feed} />
+                    <FeedButton petId={pet.id} type="snack" pending={pet.has_pending_feed} />
                   </div>
                 ) : (
                   <span className="text-xs text-text-tertiary">No device</span>

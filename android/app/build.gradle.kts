@@ -20,8 +20,8 @@ android {
         applicationId = "com.servl.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 22
-        versionName = "2.0.2"
+        versionCode = 23
+        versionName = "2.0.3"
 
         // Debug: points to the same cloud server as release.
         // To test against a local server instead, change these to your PC's LAN IP.

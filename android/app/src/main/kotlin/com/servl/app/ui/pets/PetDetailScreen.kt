@@ -107,12 +107,13 @@ fun PetDetailScreen(
             // Quick feed buttons
             item {
                 val hasDevice = pet!!.device_id != null
+                val pending = pet!!.has_pending_feed
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Button(
                             onClick = { viewModel.feedMeal(petId) },
                             modifier = Modifier.weight(1f),
-                            enabled = hasDevice,
+                            enabled = hasDevice && !pending,
                         ) {
                             Icon(feedTypeIcon("meal"), contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
@@ -121,7 +122,7 @@ fun PetDetailScreen(
                         OutlinedButton(
                             onClick = { viewModel.feedSnack(petId) },
                             modifier = Modifier.weight(1f),
-                            enabled = hasDevice,
+                            enabled = hasDevice && !pending,
                         ) {
                             Icon(feedTypeIcon("snack"), contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
@@ -131,6 +132,12 @@ fun PetDetailScreen(
                     if (!hasDevice) {
                         Text(
                             "Assign a feeder device in pet settings to enable quick feeds.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary,
+                        )
+                    } else if (pending) {
+                        Text(
+                            "A feed is already in progress — buttons re-enable once the device confirms (up to 30s).",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextSecondary,
                         )

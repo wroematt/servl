@@ -12,6 +12,12 @@ data class PetDto(
     val snack_weight_g: Int,
     val daily_target_g: Int,
     val today_intake_g: Int,
+    // True while a feed_event for this pet is still 'pending' (dispensed but not
+    // yet confirmed/failed/timed-out by the device). The backend allows at most
+    // one pending feed per pet at a time — used to disable Meal/Snack buttons
+    // rather than letting a second dispense request 409 with FEED_IN_PROGRESS.
+    // Defaults to false so older API responses without this field still parse.
+    val has_pending_feed: Boolean = false,
     val deleted_at: String?,
     val created_at: String,
 )

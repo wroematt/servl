@@ -13,14 +13,29 @@ export interface Pet {
   device_name?: string | null;
   photo_url: string | null;
   today_intake_g?: number;
+  /**
+   * True while a feed_event for this pet is still 'pending' (dispensed but not
+   * yet confirmed/failed/timed-out by the device). The backend allows at most
+   * one pending feed per pet at a time — use this to disable Meal/Snack
+   * buttons rather than letting a second dispense request 409.
+   */
+  has_pending_feed?: boolean;
   deleted_at: string | null;
   created_at: string;
 }
+
+// While any pet has a feed in flight, poll faster so the Meal/Snack buttons
+// re-enable promptly once the device confirms (or the 30s worker timeout
+// flips it to 'timeout') — otherwise fall back to the default staleTime and
+// avoid hammering the API for no reason.
+const PENDING_FEED_POLL_MS = 4_000;
 
 export function usePets() {
   return useQuery<Pet[]>({
     queryKey: ['pets'],
     queryFn: () => api.get('/pets'),
+    refetchInterval: (query) =>
+      query.state.data?.some((p) => p.has_pending_feed) ? PENDING_FEED_POLL_MS : false,
   });
 }
 
@@ -29,6 +44,7 @@ export function usePet(petId: string) {
     queryKey: ['pets', petId],
     queryFn: () => api.get(`/pets/${petId}`),
     enabled: !!petId,
+    refetchInterval: (query) => (query.state.data?.has_pending_feed ? PENDING_FEED_POLL_MS : false),
   });
 }
 
