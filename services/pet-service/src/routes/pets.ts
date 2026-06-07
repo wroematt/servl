@@ -14,6 +14,33 @@ function getHeaders(req: Request) {
   };
 }
 
+const deviceAlreadyAssignedError = {
+  code: 'DEVICE_ALREADY_ASSIGNED',
+  message: 'This feeder is already assigned to another pet — unassign it there first.',
+};
+
+// First line of defence against linking the same physical feeder to more than
+// one pet (every dispense for any of those pets would target one feeder,
+// making feed history / schedules / daily targets meaningless for it). The
+// partial unique index idx_pets_one_per_device (see
+// postgres/migrations/006_pets_one_per_device.sql) is what actually closes
+// the race between two near-simultaneous assignment requests — callers also
+// catch its unique-violation (23505) as a backstop. excludePetId lets PATCH
+// ignore the pet's own current assignment.
+async function assertDeviceNotAssigned(
+  deviceId: string,
+  householdId: string,
+  excludePetId?: string,
+): Promise<typeof deviceAlreadyAssignedError | null> {
+  const result = await db.query(
+    `SELECT id FROM pets
+     WHERE device_id = $1 AND household_id = $2 AND deleted_at IS NULL
+       AND ($3::uuid IS NULL OR id != $3)`,
+    [deviceId, householdId, excludePetId ?? null],
+  );
+  return result.rows[0] ? deviceAlreadyAssignedError : null;
+}
+
 // ── GET /pets ──────────────────────────────────
 
 petsRouter.get('/', async (req: Request, res: Response) => {
@@ -61,11 +88,24 @@ petsRouter.post('/', upload.single('photo'), async (req: Request, res: Response)
   const { name, type, meal_weight_g, snack_weight_g, daily_target_g, device_id } = body.data;
   const photoUrl = req.file ? `/uploads/${path.basename(req.file.path)}` : null;
 
-  const result = await db.query(
-    `INSERT INTO pets (household_id, device_id, name, type, photo_url, meal_weight_g, snack_weight_g, daily_target_g)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-    [householdId, device_id ?? null, name, type, photoUrl, meal_weight_g, snack_weight_g, daily_target_g],
-  );
+  if (device_id) {
+    const conflict = await assertDeviceNotAssigned(device_id, householdId);
+    if (conflict) return res.status(409).json(conflict);
+  }
+
+  let result;
+  try {
+    result = await db.query(
+      `INSERT INTO pets (household_id, device_id, name, type, photo_url, meal_weight_g, snack_weight_g, daily_target_g)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [householdId, device_id ?? null, name, type, photoUrl, meal_weight_g, snack_weight_g, daily_target_g],
+    );
+  } catch (err: unknown) {
+    if ((err as { code?: string } | null)?.code === '23505') {
+      return res.status(409).json(deviceAlreadyAssignedError);
+    }
+    throw err;
+  }
   return res.status(201).json(result.rows[0]);
 });
 
@@ -122,6 +162,13 @@ petsRouter.patch('/:petId', upload.single('photo'), async (req: Request, res: Re
   );
   if (!pet.rows[0]) return res.status(404).json({ code: 'NOT_FOUND', message: 'Pet not found' });
 
+  // Only check when device_id is actually being changed to a real device —
+  // unassigning (null) or leaving it untouched (undefined) can't conflict.
+  if (body.data.device_id) {
+    const conflict = await assertDeviceNotAssigned(body.data.device_id, householdId, req.params.petId);
+    if (conflict) return res.status(409).json(conflict);
+  }
+
   const fields: Record<string, unknown> = { ...body.data };
   // If a new photo was uploaded, override photo_url
   if (req.file) {
@@ -141,10 +188,18 @@ petsRouter.patch('/:petId', upload.single('photo'), async (req: Request, res: Re
     return res.json(updated.rows[0]);
   }
   values.push(req.params.petId);
-  const result = await db.query(
-    `UPDATE pets SET ${setClauses.join(', ')} WHERE id = $${idx} RETURNING *`,
-    values,
-  );
+  let result;
+  try {
+    result = await db.query(
+      `UPDATE pets SET ${setClauses.join(', ')} WHERE id = $${idx} RETURNING *`,
+      values,
+    );
+  } catch (err: unknown) {
+    if ((err as { code?: string } | null)?.code === '23505') {
+      return res.status(409).json(deviceAlreadyAssignedError);
+    }
+    throw err;
+  }
 
   // Cascade weight changes to meal / snack schedules for this pet so that
   // schedules always reflect the pet's current portion sizes.
