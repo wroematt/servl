@@ -8,6 +8,7 @@
 #include "wifi_conn.h"
 #include "mqtt_conn.h"
 #include "dispenser.h"
+#include "stepper.h"
 #include "led_status.h"
 
 // ─── Application states ───────────────────────────────────────────────────────
@@ -43,6 +44,7 @@ void setup() {
     pinMode(PIN_BUTTON, INPUT_PULLUP);   // BOOT button is active LOW
     digitalWrite(PIN_LED, LOW);
 
+    stepper_init();
     dispenser_reset_hopper();
 
     log_i("[main] Servl firmware v%s booting...", FIRMWARE_VERSION);
@@ -169,8 +171,10 @@ static void handle_mqtt_connecting() {
     if (mqtt_connect(s_creds)) {
         log_i("[main] MQTT connected — moving to OPERATIONAL");
 
-        // Publish initial heartbeat (hopper_pct is 100 on fresh boot; or whatever
-        // was last reduced before a previous power-cycle — virtual only, resets to 100).
+        // Publish initial heartbeat. hopper_pct is currently an open-loop estimate
+        // with no persistence (see dispenser.h TODO) — it always reads 100 on
+        // boot/reconnect, regardless of what it was before a power-cycle, until
+        // the load-cell hopper scale (TaskList #9) provides a real measurement.
         mqtt_publish_status(nullptr, -1, dispenser_get_hopper_pct(), "ok");
         s_heartbeatAt = millis() + HEARTBEAT_INTERVAL_MS;
 
@@ -246,13 +250,14 @@ static void handle_operational() {
     if (g_commandPending) {
         log_i("[main] Dispense command received — moving to DISPENSING");
         s_state = AppState::DISPENSING;
-        led_status_set(LedState::OFF);  // dispenser_run() controls the LED
+        led_status_set(LedState::DISPENSING);  // fast blink — auger motor running
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // State: DISPENSING
-// Simulate the dispense, then publish confirmation and return to OPERATIONAL.
+// Drive the auger to dispense the requested weight, then publish confirmation
+// and return to OPERATIONAL.
 // ─────────────────────────────────────────────────────────────────────────────
 static void handle_dispensing() {
     // Capture the command before clearing the flag.
@@ -261,7 +266,8 @@ static void handle_dispensing() {
 
     log_i("[main] DISPENSING %dg  command_id: %s", cmd.weight_g, cmd.command_id);
 
-    // dispenser_run() flashes the LED and calls mqtt_loop() per gram.
+    // dispenser_run() drives the stepper motor (see stepper.cpp) and pumps
+    // mqtt_loop() periodically to keep the connection alive during the rotation.
     dispenser_run(cmd.weight_g);
 
     int hopper = dispenser_get_hopper_pct();

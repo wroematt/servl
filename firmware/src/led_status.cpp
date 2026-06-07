@@ -20,7 +20,6 @@ void led_status_set(LedState state) {
 
 void led_status_update() {
     if (s_state == LedState::OFF) {
-        // Dispensing task controls the LED directly; we stay out of the way.
         return;
     }
 
@@ -29,11 +28,12 @@ void led_status_update() {
     // Determine on/off durations based on current state.
     uint32_t onMs, offMs;
     switch (s_state) {
-        case LedState::PROVISIONING:    onMs = 500;  offMs = 500;  break;
-        case LedState::WIFI_CONNECTING: onMs = 100;  offMs = 100;  break;
-        case LedState::MQTT_CONNECTING: onMs = 200;  offMs = 200;  break;
-        case LedState::OPERATIONAL:     onMs = 50;   offMs = 4950; break;
-        default:                        onMs = 500;  offMs = 500;  break;
+        case LedState::PROVISIONING:    onMs = 500;                    offMs = 500;                    break;
+        case LedState::WIFI_CONNECTING: onMs = 100;                    offMs = 100;                    break;
+        case LedState::MQTT_CONNECTING: onMs = 200;                    offMs = 200;                    break;
+        case LedState::OPERATIONAL:     onMs = 50;                     offMs = 4950;                   break;
+        case LedState::DISPENSING:      onMs = DISPENSE_BLINK_ON_MS;   offMs = DISPENSE_BLINK_OFF_MS;  break;
+        default:                        onMs = 500;                    offMs = 500;                    break;
     }
 
     uint32_t elapsed = now - s_lastChange;

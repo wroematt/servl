@@ -1,27 +1,32 @@
 #include "dispenser.h"
 #include "config.h"
+#include "stepper.h"
 #include "mqtt_conn.h"   // for mqtt_loop() — keeps connection alive during dispense
 
 static int s_hopperPct = 100;
 
 void dispenser_run(int weight_g) {
-    log_i("[dispenser] Starting simulated dispense: %d g  hopper: %d%%",
-          weight_g, s_hopperPct);
+    long steps = (long)weight_g * STEPPER_STEPS_PER_GRAM;
 
-    for (int i = 0; i < weight_g; i++) {
-        digitalWrite(PIN_LED, HIGH);
-        delay(FLASH_ON_MS);
-        digitalWrite(PIN_LED, LOW);
-        delay(FLASH_OFF_MS);
+    log_i("[dispenser] Dispensing %d g  (%ld steps @ %ld steps/g, hopper currently ~%d%%)",
+          weight_g, steps, STEPPER_STEPS_PER_GRAM, s_hopperPct);
 
-        // Keep the MQTT connection alive during the (potentially long) flash loop.
-        mqtt_loop();
-    }
+    // Drive the auger. stepper_move() pumps mqtt_loop() periodically (via the
+    // onTick callback) so the broker connection survives what can be a
+    // multi-second rotation for larger portions.
+    stepper_move(steps, mqtt_loop);
 
-    // Update virtual hopper: 1% per gram, floor at 0.
+    // No need to hold position between dispenses — de-energise the coils to
+    // keep the driver/motor cool and save power.
+    stepper_disable();
+
+    // Hopper estimate: -1 % per gram, floored at 0. This is an open-loop
+    // guess with no relationship to how much food is actually left — it's a
+    // placeholder until the load-cell hopper scale (TaskList #9) provides a
+    // real measurement referenced against a calibrated empty-hopper baseline.
     s_hopperPct = max(0, s_hopperPct - weight_g);
 
-    log_i("[dispenser] Dispense complete. Hopper now: %d%%", s_hopperPct);
+    log_i("[dispenser] Dispense complete. Hopper now: ~%d%% (estimated, no load cells yet)", s_hopperPct);
 }
 
 int dispenser_get_hopper_pct() {
@@ -30,5 +35,5 @@ int dispenser_get_hopper_pct() {
 
 void dispenser_reset_hopper() {
     s_hopperPct = 100;
-    log_i("[dispenser] Hopper reset to 100%%");
+    log_i("[dispenser] Hopper estimate reset to 100%%");
 }
