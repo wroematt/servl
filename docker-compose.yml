@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────
-#  Servl — Docker Compose (Raspberry Pi)
-#  All services run on a single Pi 4 (4 GB).
-#  For cloud migration: each service can be
+#  Servl — Docker Compose (Oracle Cloud server)
+#  All services run on a single Oracle Cloud (OCI) instance.
+#  For further scaling: each service can be
 #  extracted to its own compose file or k8s pod.
 # ─────────────────────────────────────────────
 
@@ -143,8 +143,12 @@ services:
       - MQTT_INTERNAL_USER=${MQTT_INTERNAL_USER}
       - MQTT_INTERNAL_PASS=${MQTT_INTERNAL_PASS}
       - NOTIFICATION_SERVICE_URL=http://notification-service:3004
-      # LAN URL that ESP32 devices can reach for OTA firmware downloads.
-      # Set this to http://<raspberry-pi-lan-ip>:3000 in your .env file.
+      # URL that ESP32 devices can reach for OTA firmware downloads.
+      # NOTE: this was originally a home-LAN IP (the backend ran on a Pi on
+      # the same network as the devices). Now that the backend runs on an
+      # Oracle Cloud server, ESP32 devices on the home LAN can no longer
+      # reach a LAN-local address here — point this at a publicly reachable
+      # URL instead (e.g. https://${DOMAIN}/ota) and verify the route exists.
       - OTA_BASE_URL=${OTA_BASE_URL:-http://localhost:3000}
     networks:
       - internal

@@ -110,7 +110,7 @@ docker compose exec postgres psql -U petfeeder -d petfeeder \
 - **Soft deletes for pets** — `pets.deleted_at` hides pets from queries while preserving all feed history.
 - **MQTT confirmation loop** — every dispense creates a `pending` feed event. The device confirms via MQTT which updates the row to `confirmed` (or `failed`/`timeout`).
 - **Per-device TLS certificates** — each ESP32 gets a unique X.509 client cert at provisioning. A compromised device can be revoked without affecting others.
-- **Cloudflare Tunnel** — solves home hosting (no static IP, no port forwarding) and provides free TLS termination.
+- **Cloudflare Tunnel** — provides free TLS termination and keeps the origin server's IP out of DNS. (Originally also solved home hosting behind NAT when the backend ran on a Pi; it now runs on an Oracle Cloud server with a public IP, so the tunnel is kept mainly for TLS + IP hiding.)
 - **Services trust gateway headers** — `x-user-id`, `x-household-id`, `x-user-role` are set by the gateway after JWT verification. Services never re-verify the JWT.
 
 ## Environment variables

@@ -16,10 +16,11 @@ The system consists of:
 - **Backend** (Node.js / TypeScript) — REST API, MQTT broker, job scheduler
 - **Firmware** (ESP32 / C++) — device logic (out of scope for this codebase)
 
-The backend runs entirely in Docker containers on a Raspberry Pi 4 at home,
-exposed to the internet via Cloudflare Tunnel (no port forwarding needed).
-Everything is designed to be portable — the same Docker Compose file can run
-on a VPS or cloud provider without code changes.
+The backend runs entirely in Docker containers on an Oracle Cloud (OCI) server,
+exposed to the internet via Cloudflare Tunnel for TLS termination and to avoid
+exposing the origin server's IP directly. Everything is designed to be portable —
+the same Docker Compose file can run on any VPS, cloud provider, or home server
+without code changes.
 
 The brand name for the system is "servl" which is pronounced like the animal serval
 while also including the verb serve as in to serve food.
@@ -439,8 +440,11 @@ UX and design intent for every screen. Refer to these when building the frontend
   record of what was actually dispensed vs requested, and surfaces device failures.
 - **Per-device MQTT certs**: password-based MQTT auth is weak. X.509 certificates
   mean a compromised device can be revoked by deleting its cert without affecting others.
-- **Cloudflare Tunnel**: solves home hosting (no static IP, no port forwarding)
-  and provides free TLS termination. Zero config on the router.
+- **Cloudflare Tunnel**: provides free TLS termination and keeps the origin
+  server's IP out of DNS — useful regardless of where the box is hosted, and
+  was essential when the backend ran on a home Pi behind NAT (no static IP,
+  no router port-forwarding). Now that it runs on an Oracle Cloud server with
+  a public IP, the tunnel is kept mainly for TLS + DDoS protection / IP hiding.
 - **Services trust gateway headers**: avoids re-validating JWT in every service.
   The gateway is the single auth enforcement point. Services assume the gateway
   has already validated — this keeps service code simple.
