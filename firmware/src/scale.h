@@ -40,7 +40,20 @@
 // on a brand new, not-yet-filled unit. Logs a loud warning either way so this
 // assumption is visible in the device log. Call once from setup(), before the
 // first scale_read_grams().
+//
+// Bounded by SCALE_READY_TIMEOUT_MS: if the HX711 never reports a conversion
+// ready (no chip wired up — e.g. bench-testing the stepper in isolation
+// before the load cells are connected, per the intended #8 → #9 → #10
+// incremental hardware bring-up order — or a failed sensor), this logs a
+// loud warning and returns rather than blocking forever. See scale_is_present().
 void scale_init();
+
+// True if the HX711 responded within SCALE_READY_TIMEOUT_MS during
+// scale_init() AND is still responding now. False means the hopper scale is
+// absent, disconnected, or has stopped responding — scale_read_grams()
+// returns NAN in that state instead of blocking forever, and dispenser.cpp
+// falls back to a bounded open-loop dispense (see dispenser_run()).
+bool scale_is_present();
 
 // True once the HX711 reports a conversion is ready. scale_read_grams() and
 // scale_recalibrate_empty() block until this is true — avoid calling them on
@@ -51,7 +64,10 @@ bool scale_is_ready();
 
 // Current weight in grams, relative to the persisted empty-hopper baseline
 // (0 g == empty), averaged over SCALE_SAMPLES raw reads to smooth out
-// load-cell noise. Blocks until SCALE_SAMPLES conversions complete.
+// load-cell noise. Blocks until SCALE_SAMPLES conversions complete — bounded
+// by SCALE_READY_TIMEOUT_MS. Returns NAN if the scale is absent/not
+// responding (see scale_is_present()) — callers MUST check with isnan()
+// before trusting the result.
 float scale_read_grams();
 
 // Re-tare against whatever load is on the platform RIGHT NOW and persist the

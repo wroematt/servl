@@ -13,20 +13,20 @@ constexpr uint8_t PIN_BUTTON = 0;
 // one (micro)step; DIR sets rotation direction; ENABLE is active-LOW (the
 // driver only energises its coils while this pin is held low).
 constexpr uint8_t PIN_STEPPER_STEP   = 25;
-constexpr uint8_t PIN_STEPPER_DIR    = 26;
-constexpr uint8_t PIN_STEPPER_ENABLE = 33;
+constexpr uint8_t PIN_STEPPER_DIR    = 33;
+constexpr uint8_t PIN_STEPPER_ENABLE = 32;
 
 // HX711 load-cell ADC (DOUT/SCK interface). All 4 hopper load cells wire into
 // a single summing junction ahead of one HX711 — the firmware only ever talks
 // to one ADC channel and has no visibility into the individual cells.
-constexpr uint8_t PIN_SCALE_DOUT = 4;
-constexpr uint8_t PIN_SCALE_SCK  = 16;
+constexpr uint8_t PIN_SCALE_DOUT = 26;
+constexpr uint8_t PIN_SCALE_SCK  = 14;
 
 // Physical Meal / Snack feed buttons (see TaskList #10 — "two buttons on the
 // device will act as Meal and Snack feed buttons"). Wired active-LOW with
 // internal pull-ups, exactly like PIN_BUTTON (BOOT). GPIO32 and GPIO13 are
 // free of any other on-board role and are not boot-strapping pins.
-constexpr uint8_t PIN_BUTTON_MEAL  = 32;
+constexpr uint8_t PIN_BUTTON_MEAL  = 12;
 constexpr uint8_t PIN_BUTTON_SNACK = 13;
 
 // ─── Timing ──────────────────────────────────────────────────────────────────
@@ -72,7 +72,7 @@ constexpr uint32_t DISPENSE_BLINK_OFF_MS = 80;
 // pads, NOT controlled from firmware, so it must be kept in sync with
 // whatever the board is physically configured for.
 constexpr uint16_t STEPPER_FULL_STEPS_PER_REV = 200;
-constexpr uint16_t STEPPER_MICROSTEPS         = 16;
+constexpr uint16_t STEPPER_MICROSTEPS         = 32;
 constexpr long     STEPPER_STEPS_PER_REV      =
     (long)STEPPER_FULL_STEPS_PER_REV * STEPPER_MICROSTEPS;
 
@@ -85,7 +85,7 @@ constexpr long STEPPER_STEPS_PER_GRAM = STEPPER_STEPS_PER_REV / 4;
 
 // Motion profile. Conservative starting point — raise once the mechanical
 // assembly is verified to run reliably without skipping steps at speed.
-constexpr float STEPPER_MAX_SPEED_STEPS_PER_SEC = 800.0f;
+constexpr float STEPPER_MAX_SPEED_STEPS_PER_SEC = 1600.0f;
 constexpr float STEPPER_ACCEL_STEPS_PER_SEC2    = 400.0f;
 
 // ─── Hopper scale (load cells) ───────────────────────────────────────────────
@@ -94,6 +94,16 @@ constexpr float STEPPER_ACCEL_STEPS_PER_SEC2    = 400.0f;
 // reports a conversion ready, roughly SCALE_SAMPLES x ~100 ms at the HX711's
 // default 10 SPS).
 constexpr uint8_t SCALE_SAMPLES = 8;
+
+// Maximum time to wait for the HX711 to report a conversion ready before
+// concluding it isn't physically present/responding — disconnected load
+// cells, no chip wired up yet during incremental hardware bring-up (see
+// TaskList #8/#9/#10 — the intent is to test the stepper, then the scale,
+// then the buttons, AS EACH IS WIRED UP, not all at once), or a failed
+// sensor in the field. Bounds what would otherwise be an indefinite block
+// in the HX711 library's read()/tare()/get_units() (it loops on is_ready()
+// with no timeout of its own) — see scale_wait_ready() in scale.cpp.
+constexpr uint32_t SCALE_READY_TIMEOUT_MS = 3000;
 
 // Raw-ADC-counts-per-gram for the wired-up load cells + HX711 combination.
 // Like STEPPER_STEPS_PER_GRAM, this is a "tune once the hardware is final"
@@ -129,7 +139,7 @@ constexpr uint32_t DISPENSE_POLL_INTERVAL_MS = 250;
 // forever (empty hopper, jam, miscalibrated scale, etc). Generous enough for
 // the largest realistic portion at the conservative speed above; tune down
 // once real-world dispense durations are known.
-constexpr uint32_t DISPENSE_TIMEOUT_MS = 60000;
+constexpr uint32_t DISPENSE_TIMEOUT_MS = 10000;
 
 // WiFi and MQTT connection timeouts during provisioning commit test.
 constexpr uint32_t WIFI_CONNECT_TIMEOUT_MS = 15000;
