@@ -65,9 +65,15 @@ static bool poll_one(ButtonState& btn, uint32_t now) {
 }
 
 void buttons_init() {
-    pinMode(PIN_BUTTON_MEAL,  INPUT_PULLUP);
+    // PIN_BUTTON_MEAL is an input-only GPIO (34/35/36/39) — these pins have no
+    // internal pull-up hardware, so INPUT_PULLUP is silently ignored on ESP32.
+    // Use plain INPUT and rely on the external 10 kΩ pull-up resistor to 3.3 V
+    // wired on the board (see config.h PIN_BUTTON_MEAL comment).
+    // PIN_BUTTON_SNACK is a regular bidirectional GPIO — internal pull-up is fine.
+    pinMode(PIN_BUTTON_MEAL,  INPUT);
     pinMode(PIN_BUTTON_SNACK, INPUT_PULLUP);
-    log_i("[buttons] Meal=GPIO%d Snack=GPIO%d (active LOW, double-click window %lums)",
+    log_i("[buttons] Meal=GPIO%d (ext pull-up) Snack=GPIO%d (int pull-up) "
+          "active LOW, double-click window %lums",
           PIN_BUTTON_MEAL, PIN_BUTTON_SNACK, (unsigned long)DOUBLE_CLICK_WINDOW_MS);
 }
 

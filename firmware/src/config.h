@@ -26,15 +26,19 @@ constexpr uint8_t PIN_SCALE_SCK  = 14;
 // device will act as Meal and Snack feed buttons"). Wired active-LOW with
 // internal pull-ups (configured via INPUT_PULLUP in buttons_init()).
 //
-// GPIO4 (MEAL) and GPIO13 (SNACK) — neither is a strapping pin, both support
-// INPUT_PULLUP, and neither is used by any other peripheral. Wire each button
-// between the GPIO and GND; no external resistor is needed.
+// GPIO34 (MEAL) — input-only GPIO (no internal pull-up/pull-down hardware).
+// Requires a 10 kΩ external pull-up resistor from GPIO34 to 3.3 V; the button
+// then wires between GPIO34 and GND as usual. Because input-only GPIOs silently
+// ignore INPUT_PULLUP, buttons_init() sets this pin with INPUT mode and relies
+// on that external resistor to hold the line HIGH when the button is open.
 //
-// ⚠ GPIO12 (MTDI) was originally assigned here but is unusable as a button
-// input on ESP32-WROOM-32 modules: the module PCB holds it LOW to lock the
-// flash at 3.3 V, which fights INPUT_PULLUP and makes digitalRead() return LOW
-// regardless of the button state. Moved to GPIO4 to avoid this.
-constexpr uint8_t PIN_BUTTON_MEAL  = 4;
+// GPIO13 (SNACK) — regular bidirectional GPIO; supports INPUT_PULLUP normally.
+// Wire the button between GPIO13 and GND; no external resistor needed.
+//
+// ⚠ GPIO12 (MTDI) is held LOW by the module PCB on ESP32-WROOM-32 to lock
+// the flash at 3.3 V — unusable as a button input, avoid.
+// GPIO4 is on the inaccessible side of the breadboard — avoid.
+constexpr uint8_t PIN_BUTTON_MEAL  = 34;
 constexpr uint8_t PIN_BUTTON_SNACK = 13;
 
 // ─── Timing ──────────────────────────────────────────────────────────────────
@@ -182,7 +186,7 @@ constexpr uint32_t MQTT_CONNECT_TIMEOUT_MS =  8000;
 constexpr int MQTT_MAX_PACKET = 1024;
 
 // ─── Firmware identity ───────────────────────────────────────────────────────
-constexpr char FIRMWARE_VERSION[] = "1.6.3";
+constexpr char FIRMWARE_VERSION[] = "1.6.4";
 
 // BLE device name prefix — last 4 hex digits of MAC are appended at runtime
 // so multiple units can be distinguished (e.g. "Servl-A1B2").
