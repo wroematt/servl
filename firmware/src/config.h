@@ -24,8 +24,17 @@ constexpr uint8_t PIN_SCALE_SCK  = 14;
 
 // Physical Meal / Snack feed buttons (see TaskList #10 — "two buttons on the
 // device will act as Meal and Snack feed buttons"). Wired active-LOW with
-// internal pull-ups, exactly like PIN_BUTTON (BOOT). GPIO32 and GPIO13 are
-// free of any other on-board role and are not boot-strapping pins.
+// internal pull-ups (configured via INPUT_PULLUP in buttons_init()).
+//
+// ⚠ GPIO12 (MEAL) is the MTDI strapping pin. The ESP32 samples it at power-on
+// to choose flash voltage: LOW → 3.3 V (normal boot), HIGH → 1.8 V (boot
+// failure on standard modules). INPUT_PULLUP is applied in setup(), AFTER the
+// strapping sample, so the firmware is safe — but an external pull-up resistor
+// wired to the button circuit would hold the pin HIGH before setup() runs and
+// prevent the board from booting. Wire the button between GPIO12 and GND only;
+// no external resistor is needed.
+//
+// GPIO13 (SNACK) is not a strapping pin and has no boot-time restrictions.
 constexpr uint8_t PIN_BUTTON_MEAL  = 12;
 constexpr uint8_t PIN_BUTTON_SNACK = 13;
 
@@ -85,7 +94,7 @@ constexpr long STEPPER_STEPS_PER_GRAM = STEPPER_STEPS_PER_REV / 4;
 
 // Motion profile. Conservative starting point — raise once the mechanical
 // assembly is verified to run reliably without skipping steps at speed.
-constexpr float STEPPER_MAX_SPEED_STEPS_PER_SEC = 1600.0f;
+constexpr float STEPPER_MAX_SPEED_STEPS_PER_SEC = 6400.0f;
 constexpr float STEPPER_ACCEL_STEPS_PER_SEC2    = 400.0f;
 
 // ─── Hopper scale (load cells) ───────────────────────────────────────────────
@@ -125,16 +134,16 @@ constexpr float HOPPER_CAPACITY_G = 2000.0f;
 //
 // NOTE — this constant is in raw microsteps/sec, so the *physical* rotation
 // rate it produces depends on STEPPER_STEPS_PER_REV (= full-steps/rev x
-// microsteps). Bench testing at 32x microstepping measured only ~2/3 turn
-// over a 10 s run at the previous value of 400 (400 / 6400 steps-per-rev =
-// 0.0625 rev/s) — that constant was tuned back when microstepping was 16x and
-// never rescaled after STEPPER_MICROSTEPS doubled, so the real-world speed had
-// quietly halved. 1000 steps/sec at the current 6400 steps/rev works out to
-// ~0.156 rev/s (~1.5 turns over 10 s) — noticeably brisker while still well
-// under STEPPER_MAX_SPEED_STEPS_PER_SEC, leaving headroom before torque drops
-// off and steps start skipping. Re-check this math any time
+// microsteps). At 32x microstepping STEPPER_STEPS_PER_REV = 6400, so:
+//
+//   6400 steps/sec ÷ 6400 steps/rev = 1.0 rev/s (60 RPM)
+//
+// Bench-verified as a comfortable dispensing pace. Equal to
+// STEPPER_MAX_SPEED_STEPS_PER_SEC here while debugging — tighten that cap or
+// lower this constant once the mechanical assembly is finalised and the margin
+// against step-skipping is known. Re-check this math any time
 // STEPPER_MICROSTEPS or STEPPER_FULL_STEPS_PER_REV changes.
-constexpr float STEPPER_DISPENSE_SPEED_STEPS_PER_SEC = 1000.0f;
+constexpr float STEPPER_DISPENSE_SPEED_STEPS_PER_SEC = 6400.0f;
 
 // Ramp-up applied at the start of every closed-loop dispense (see
 // stepper_run_until()). setSpeed()+runSpeed() — AccelStepper's constant-speed
@@ -174,7 +183,7 @@ constexpr uint32_t MQTT_CONNECT_TIMEOUT_MS =  8000;
 constexpr int MQTT_MAX_PACKET = 1024;
 
 // ─── Firmware identity ───────────────────────────────────────────────────────
-constexpr char FIRMWARE_VERSION[] = "1.6.1";
+constexpr char FIRMWARE_VERSION[] = "1.6.2";
 
 // BLE device name prefix — last 4 hex digits of MAC are appended at runtime
 // so multiple units can be distinguished (e.g. "Servl-A1B2").
