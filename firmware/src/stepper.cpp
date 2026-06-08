@@ -59,18 +59,44 @@ void stepper_run_until(bool (*poll)()) {
     // Constant-speed "free run" — no target distance, since we don't know in
     // advance how far we'll need to go (that's the whole point of closed-loop
     // weight feedback). setSpeed()+runSpeed() is AccelStepper's API for this,
-    // as distinct from move()+run() which ramps toward a fixed target.
-    s_stepper.setSpeed(STEPPER_DISPENSE_SPEED_STEPS_PER_SEC);
+    // as distinct from move()+run() which ramps toward a fixed target — and
+    // that's precisely why THIS function has to ramp up the speed by hand
+    // below: runSpeed() has no built-in acceleration, but snapping straight
+    // from a standstill to STEPPER_DISPENSE_SPEED_STEPS_PER_SEC risks the
+    // motor stalling/losing sync under the auger's load (felt as a jerk —
+    // exactly the "not very smooth" behaviour reported on the bench). Ramp
+    // from STEPPER_RAMP_START_SPEED_STEPS_PER_SEC up to cruising speed over
+    // STEPPER_RAMP_MS, then hold constant for the remainder of the run.
+    uint32_t rampStartedAt = millis();
+    uint32_t lastSpeedAt   = 0;
+    uint32_t lastPoll      = millis();
 
-    uint32_t lastPoll = millis();
     while (true) {
+        uint32_t now = millis();
+
+        // Re-issue setSpeed() on a coarse ~20 ms cadence while ramping —
+        // frequently enough for the ramp to feel continuous, but without
+        // recomputing AccelStepper's step interval on every single pass
+        // through this tight loop (which runs orders of magnitude faster).
+        if (now - lastSpeedAt >= 20) {
+            lastSpeedAt = now;
+            uint32_t elapsed = now - rampStartedAt;
+            if (elapsed < STEPPER_RAMP_MS) {
+                float t = (float)elapsed / (float)STEPPER_RAMP_MS;
+                float speed = STEPPER_RAMP_START_SPEED_STEPS_PER_SEC +
+                    (STEPPER_DISPENSE_SPEED_STEPS_PER_SEC - STEPPER_RAMP_START_SPEED_STEPS_PER_SEC) * t;
+                s_stepper.setSpeed(speed);
+            } else {
+                s_stepper.setSpeed(STEPPER_DISPENSE_SPEED_STEPS_PER_SEC);
+            }
+        }
+
         // Must be called as close to continuously as possible — same
         // requirement as run() in stepper_move() above; this is what actually
         // emits the STEP pulses on schedule.
         s_stepper.runSpeed();
 
         if (poll) {
-            uint32_t now = millis();
             if (now - lastPoll >= DISPENSE_POLL_INTERVAL_MS) {
                 lastPoll = now;
                 if (poll()) break;

@@ -121,12 +121,34 @@ constexpr float SCALE_CALIBRATION_FACTOR = 420.0f;
 constexpr float HOPPER_CAPACITY_G = 2000.0f;
 
 // ─── Closed-loop dispensing ──────────────────────────────────────────────────
-// Constant rotation speed while dispensing under weight feedback (see
-// dispenser_run() / stepper_run_until()). No accel/decel profile is needed —
-// unlike the open-loop move in TaskList #8 there's no pre-computed target
-// distance to ramp toward, just "go until the scale says stop". Conservative
-// starting point, similar to the open-loop motion profile above.
-constexpr float STEPPER_DISPENSE_SPEED_STEPS_PER_SEC = 400.0f;
+// Cruising speed once stepper_run_until()'s brief ramp-up (below) completes.
+//
+// NOTE — this constant is in raw microsteps/sec, so the *physical* rotation
+// rate it produces depends on STEPPER_STEPS_PER_REV (= full-steps/rev x
+// microsteps). Bench testing at 32x microstepping measured only ~2/3 turn
+// over a 10 s run at the previous value of 400 (400 / 6400 steps-per-rev =
+// 0.0625 rev/s) — that constant was tuned back when microstepping was 16x and
+// never rescaled after STEPPER_MICROSTEPS doubled, so the real-world speed had
+// quietly halved. 1000 steps/sec at the current 6400 steps/rev works out to
+// ~0.156 rev/s (~1.5 turns over 10 s) — noticeably brisker while still well
+// under STEPPER_MAX_SPEED_STEPS_PER_SEC, leaving headroom before torque drops
+// off and steps start skipping. Re-check this math any time
+// STEPPER_MICROSTEPS or STEPPER_FULL_STEPS_PER_REV changes.
+constexpr float STEPPER_DISPENSE_SPEED_STEPS_PER_SEC = 1000.0f;
+
+// Ramp-up applied at the start of every closed-loop dispense (see
+// stepper_run_until()). setSpeed()+runSpeed() — AccelStepper's constant-speed
+// "free run" mode, used here because the stop point isn't known in advance —
+// has NO built-in acceleration (that's move()+run()'s feature, for a
+// pre-computed target distance). Snapping straight from a standstill to a
+// few-hundred-steps/sec constant speed risks the motor momentarily stalling/
+// losing synchronisation under the auger's load — which is exactly the
+// "jerky, not smooth" feel reported on the bench. Ramping from a gentle
+// starting speed up to cruising speed over STEPPER_RAMP_MS lets the rotor
+// build momentum gracefully first; stepper_run_until() does this by hand,
+// stepping setSpeed() upward on a timer.
+constexpr float    STEPPER_RAMP_START_SPEED_STEPS_PER_SEC = 150.0f;
+constexpr uint32_t STEPPER_RAMP_MS                         = 400;
 
 // How often the closed-loop dispense loop takes a weight reading and checks
 // progress. Reading the scale blocks for SCALE_SAMPLES HX711 conversions, so
@@ -152,7 +174,7 @@ constexpr uint32_t MQTT_CONNECT_TIMEOUT_MS =  8000;
 constexpr int MQTT_MAX_PACKET = 1024;
 
 // ─── Firmware identity ───────────────────────────────────────────────────────
-constexpr char FIRMWARE_VERSION[] = "1.6.0";
+constexpr char FIRMWARE_VERSION[] = "1.6.1";
 
 // BLE device name prefix — last 4 hex digits of MAC are appended at runtime
 // so multiple units can be distinguished (e.g. "Servl-A1B2").
