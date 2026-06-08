@@ -26,16 +26,15 @@ constexpr uint8_t PIN_SCALE_SCK  = 14;
 // device will act as Meal and Snack feed buttons"). Wired active-LOW with
 // internal pull-ups (configured via INPUT_PULLUP in buttons_init()).
 //
-// ⚠ GPIO12 (MEAL) is the MTDI strapping pin. The ESP32 samples it at power-on
-// to choose flash voltage: LOW → 3.3 V (normal boot), HIGH → 1.8 V (boot
-// failure on standard modules). INPUT_PULLUP is applied in setup(), AFTER the
-// strapping sample, so the firmware is safe — but an external pull-up resistor
-// wired to the button circuit would hold the pin HIGH before setup() runs and
-// prevent the board from booting. Wire the button between GPIO12 and GND only;
-// no external resistor is needed.
+// GPIO4 (MEAL) and GPIO13 (SNACK) — neither is a strapping pin, both support
+// INPUT_PULLUP, and neither is used by any other peripheral. Wire each button
+// between the GPIO and GND; no external resistor is needed.
 //
-// GPIO13 (SNACK) is not a strapping pin and has no boot-time restrictions.
-constexpr uint8_t PIN_BUTTON_MEAL  = 12;
+// ⚠ GPIO12 (MTDI) was originally assigned here but is unusable as a button
+// input on ESP32-WROOM-32 modules: the module PCB holds it LOW to lock the
+// flash at 3.3 V, which fights INPUT_PULLUP and makes digitalRead() return LOW
+// regardless of the button state. Moved to GPIO4 to avoid this.
+constexpr uint8_t PIN_BUTTON_MEAL  = 4;
 constexpr uint8_t PIN_BUTTON_SNACK = 13;
 
 // ─── Timing ──────────────────────────────────────────────────────────────────
@@ -183,7 +182,7 @@ constexpr uint32_t MQTT_CONNECT_TIMEOUT_MS =  8000;
 constexpr int MQTT_MAX_PACKET = 1024;
 
 // ─── Firmware identity ───────────────────────────────────────────────────────
-constexpr char FIRMWARE_VERSION[] = "1.6.2";
+constexpr char FIRMWARE_VERSION[] = "1.6.3";
 
 // BLE device name prefix — last 4 hex digits of MAC are appended at runtime
 // so multiple units can be distinguished (e.g. "Servl-A1B2").
