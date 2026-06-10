@@ -35,7 +35,16 @@ app.use(
       if (!origin || allowedOrigins.has(origin)) {
         callback(null, true);
       } else {
-        callback(new Error(`CORS: origin ${origin} not allowed`));
+        // Pass `false` (not an Error) for disallowed origins. An Error here
+        // makes the cors middleware call next(err), which aborts the WHOLE
+        // request before it reaches the route handler — breaking non-fetch
+        // requests (form POSTs, redirects, webviews) that carry an Origin
+        // header the browser doesn't actually need a CORS response for.
+        // `false` just omits Access-Control-Allow-Origin, so disallowed
+        // browser fetch/XHR is still correctly blocked client-side, while
+        // everything else (e.g. the OAuth login form, which Google's webview
+        // submits with "Origin: null") proceeds normally.
+        callback(null, false);
       }
     },
     credentials: true,
