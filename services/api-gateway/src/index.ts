@@ -110,7 +110,26 @@ app.use('/auth', authLimiter, createProxyMiddleware({
   pathRewrite: rewritePath('/auth'),
 }));
 
-// Google Home webhook — authenticated via HMAC, not JWT
+// OAuth 2.0 account-linking endpoints (Google Home).
+// Public — auth handled inside user-service (login form / token endpoint).
+// Uses the same auth rate limiter as /auth to cover the login form POST.
+app.use('/oauth', authLimiter, createProxyMiddleware({
+  target: USER_SERVICE_URL,
+  changeOrigin: true,
+  pathRewrite: rewritePath('/oauth'),
+}));
+
+// Google Home Smart Home API webhook — authenticated via OAuth JWT Bearer.
+// Public (no gateway auth middleware) — feed-service verifies the JWT itself.
+// No rate limiter: Google's Home Graph sends frequent SYNC/QUERY calls and
+// spurious 429s would break device state updates.
+app.use('/webhook/smarthome', createProxyMiddleware({
+  target: FEED_SERVICE_URL,
+  changeOrigin: true,
+  pathRewrite: rewritePath('/webhook/smarthome'),
+}));
+
+// Legacy Google Home webhook — authenticated via HMAC or static Bearer token
 app.use('/webhook/google-home', createProxyMiddleware({
   target: FEED_SERVICE_URL,
   changeOrigin: true,

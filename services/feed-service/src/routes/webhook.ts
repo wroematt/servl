@@ -2,46 +2,74 @@ import 'express-async-errors';
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 import { db } from '../lib/db';
 import { createDispense } from '../lib/dispense';
 import { config } from '../config';
 
 export const webhookRouter = Router();
 
-// ── Authentication ────────────────────────────────────────────────────────────
-// Two modes, both keyed to GOOGLE_HOME_HMAC_SECRET:
+// ── Authentication ─────────────────────────────────────────────────────────────
+// Three modes, checked in priority order:
 //
-//   1. X-Hub-Signature-256: sha256=<HMAC-SHA256(secret, body)>
-//      Standard Google Actions fulfillment format — Google's servers sign the
-//      raw request body before forwarding it to the fulfilment URL.
+//   1. X-Hub-Signature-256: sha256=<HMAC-SHA256(GOOGLE_HOME_HMAC_SECRET, body)>
+//      Google Actions legacy fulfillment — raw body HMAC.
 //
-//   2. Authorization: Bearer <secret>
-//      Simple token for Google Home Routines and other HTTP callers (e.g.
-//      Home Assistant, IFTTT) that cannot compute a body HMAC client-side.
-//      Both sides are hashed through SHA-256 before timingSafeEqual so the
-//      comparison is constant-time regardless of token length.
-function isAuthorised(secret: string, rawBody: Buffer, req: Request): boolean {
+//   2. Authorization: Bearer <JWT>
+//      OAuth account-linking mode. Google sends the OAuth access token issued
+//      by /oauth/token as a Bearer JWT. We verify it with JWT_SECRET and extract
+//      the household_id from the claim — no household_id needed in the body.
+//      JWTs always start with "eyJ" (base64url of `{"alg":...}`), so we can
+//      distinguish them from static-secret Bearer tokens.
+//
+//   3. Authorization: Bearer <static-secret>
+//      Simple token mode for HTTP callers (Home Assistant, IFTTT, etc.) that
+//      cannot compute a body HMAC. Compared via constant-time hash comparison.
+
+type AuthResult =
+  | { ok: true;  mode: 'hmac' | 'static' }
+  | { ok: true;  mode: 'jwt'; userId: string; householdId: string; role: string }
+  | { ok: false };
+
+function authenticate(rawBody: Buffer, req: Request): AuthResult {
   const sig = req.headers['x-hub-signature-256'] as string | undefined;
   if (sig) {
-    const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
+    const expected = 'sha256=' + crypto.createHmac('sha256', config.GOOGLE_HOME_HMAC_SECRET)
+      .update(rawBody).digest('hex');
     try {
-      return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(sig));
-    } catch {
-      return false;
-    }
+      if (crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(sig))) {
+        return { ok: true, mode: 'hmac' };
+      }
+    } catch { /* length mismatch → fall through */ }
+    return { ok: false };
   }
 
   const auth = req.headers['authorization'] as string | undefined;
   if (auth?.startsWith('Bearer ')) {
     const token = auth.slice(7);
-    // Hash both values so timingSafeEqual always receives equal-length buffers,
-    // avoiding both exceptions and length-based timing leaks.
-    const secretHash = crypto.createHash('sha256').update(secret).digest();
+
+    // JWTs start with "eyJ" — verify as OAuth access token.
+    if (token.startsWith('eyJ')) {
+      try {
+        const payload = jwt.verify(token, config.JWT_SECRET) as {
+          sub: string; household_id: string; role: string;
+        };
+        return { ok: true, mode: 'jwt', userId: payload.sub,
+                 householdId: payload.household_id, role: payload.role };
+      } catch {
+        return { ok: false };
+      }
+    }
+
+    // Static-secret comparison — hash both sides for constant-time equal length.
+    const secretHash = crypto.createHash('sha256').update(config.GOOGLE_HOME_HMAC_SECRET).digest();
     const tokenHash  = crypto.createHash('sha256').update(token).digest();
-    return crypto.timingSafeEqual(secretHash, tokenHash);
+    try {
+      if (crypto.timingSafeEqual(secretHash, tokenHash)) return { ok: true, mode: 'static' };
+    } catch { /* ignore */ }
   }
 
-  return false;
+  return { ok: false };
 }
 
 // Returns a JSON body understood by both Google Actions fulfillment
@@ -50,26 +78,40 @@ function voice(text: string) {
   return { fulfillmentText: text, message: text };
 }
 
-// ── Request schema ────────────────────────────────────────────────────────────
-// Exactly one of pet_name / pet_type must be present:
+// ── Request schemas ──────────────────────────────────────────────────────────
+// Two formats are accepted:
 //
-//   pet_name  — "Hey Google, feed Felix a meal"
-//   pet_type  — "Hey Google, feed the cat" (only works if exactly one cat/dog
-//               exists in the household; returns a helpful error if there are
-//               multiple, directing the caller to use the pet's name instead)
+//   Flat format (HMAC / static-secret callers, Home Assistant, IFTTT):
+//     { household_id, pet_name|pet_type, feed_type }
 //
-// household_id scopes ALL pet lookups so one server can host multiple families
-// without data leaking between them. Callers embed their household UUID in the
-// request body — find yours in your Servl account settings.
-const bodySchema = z.object({
+//   Actions Builder format (OAuth JWT callers — Google Actions webhook):
+//     { handler: { name: "feed_pet" }, intent: { params: { pet: { resolved }, feed_type: { resolved } } } }
+//     household_id comes from the verified JWT claim, not the body.
+
+// Flat request body — household_id required because the caller has no JWT context.
+const flatBodySchema = z.object({
   household_id: z.string().uuid(),
   pet_name:     z.string().min(1).optional(),
-  pet_type:     z.enum(['cat', 'dog']).optional(),  // 'other' pets need a name
+  pet_type:     z.enum(['cat', 'dog']).optional(),
   feed_type:    z.enum(['meal', 'snack']).default('meal'),
 }).refine(
   (d) => Boolean(d.pet_name) !== Boolean(d.pet_type),
   { message: 'Provide exactly one of pet_name or pet_type.' },
 );
+
+// Actions Builder format. Google sends intent params as:
+//   intent.params.<entity>.resolved  (for slot-filled entities)
+// Handler name must be "feed_pet". Pet slot ("pet") resolves to the pet's name
+// or type; feed_type slot resolves to "meal" or "snack".
+const actionsBodySchema = z.object({
+  handler: z.object({ name: z.string() }),
+  intent:  z.object({
+    params: z.object({
+      pet:       z.object({ resolved: z.string() }).optional(),
+      feed_type: z.object({ resolved: z.enum(['meal', 'snack']) }).optional(),
+    }).optional(),
+  }).optional(),
+});
 
 type PetRow = {
   id:             string;
@@ -85,7 +127,8 @@ type PetRow = {
 webhookRouter.post('/', async (req: Request, res: Response) => {
   const rawBody = req.body as Buffer;
 
-  if (!isAuthorised(config.GOOGLE_HOME_HMAC_SECRET, rawBody, req)) {
+  const auth = authenticate(rawBody, req);
+  if (!auth.ok) {
     return res.status(401).json({ code: 'UNAUTHORIZED', message: 'Invalid credentials' });
   }
 
@@ -96,15 +139,49 @@ webhookRouter.post('/', async (req: Request, res: Response) => {
     return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'Invalid JSON' });
   }
 
-  const result = bodySchema.safeParse(parsed);
-  if (!result.success) {
-    return res.status(400).json({
-      code:    'VALIDATION_ERROR',
-      message: result.error.issues[0]?.message ?? 'Invalid request body',
-    });
-  }
+  // ── Normalise the request into a flat shape ──────────────────────────────
+  // Both paths converge to { household_id, pet_name?, pet_type?, feed_type }.
+  let household_id: string;
+  let pet_name: string | undefined;
+  let pet_type: 'cat' | 'dog' | undefined;
+  let feed_type: 'meal' | 'snack' = 'meal';
 
-  const { household_id, pet_name, pet_type, feed_type } = result.data;
+  if (auth.mode === 'jwt') {
+    // OAuth path — household_id from JWT; body is Actions Builder format.
+    const actionsResult = actionsBodySchema.safeParse(parsed);
+    if (!actionsResult.success || actionsResult.data.handler.name !== 'feed_pet') {
+      return res.json(voice("Sorry, I didn't understand that feeding request."));
+    }
+    household_id = auth.householdId;
+    const params = actionsResult.data.intent?.params;
+    const petSlot = params?.pet?.resolved ?? '';
+    feed_type = params?.feed_type?.resolved ?? 'meal';
+
+    // The pet slot is filled with whatever the user says — could be a name
+    // ("Felix") or a type ("cat", "dog"). Treat single-word type matches as
+    // type lookups; everything else is a name search.
+    const PET_TYPES = ['cat', 'dog'] as const;
+    const typeMatch = PET_TYPES.find((t) => petSlot.toLowerCase() === t);
+    if (typeMatch) {
+      pet_type = typeMatch;
+    } else {
+      pet_name = petSlot || undefined;
+    }
+
+    if (!pet_name && !pet_type) {
+      return res.json(voice("I didn't catch which pet to feed. Please try again."));
+    }
+  } else {
+    // HMAC / static-secret path — flat body with explicit household_id.
+    const result = flatBodySchema.safeParse(parsed);
+    if (!result.success) {
+      return res.status(400).json({
+        code:    'VALIDATION_ERROR',
+        message: result.error.issues[0]?.message ?? 'Invalid request body',
+      });
+    }
+    ({ household_id, pet_name, pet_type, feed_type } = result.data);
+  }
 
   // ── Pet lookup ──────────────────────────────────────────────────────────────
   let pet: PetRow | null = null;

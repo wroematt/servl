@@ -96,6 +96,10 @@ services:
       - RESET_TOKEN_TTL=3600
       - USER_MEDIA_UPLOAD_PATH=/user-uploads
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      # Optional — leave blank to disable Google Home account-linking.
+      # See .env.example for instructions on generating these values.
+      - GOOGLE_HOME_OAUTH_CLIENT_ID=${GOOGLE_HOME_OAUTH_CLIENT_ID:-}
+      - GOOGLE_HOME_OAUTH_CLIENT_SECRET=${GOOGLE_HOME_OAUTH_CLIENT_SECRET:-}
     volumes:
       - user_media_uploads:/user-uploads
     networks:
@@ -179,6 +183,9 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - DEVICE_SERVICE_URL=http://device-service:3003
       - GOOGLE_HOME_HMAC_SECRET=${GOOGLE_HOME_HMAC_SECRET}
+      # JWT_SECRET lets feed-service verify OAuth access tokens issued by user-service
+      # directly, without an extra HTTP call per voice command.
+      - JWT_SECRET=${JWT_SECRET}
     networks:
       - internal
     depends_on:

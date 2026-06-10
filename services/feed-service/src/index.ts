@@ -4,14 +4,20 @@ import { config } from './config';
 import { feedRouter } from './routes/feed';
 import { internalRouter } from './routes/internal';
 import { webhookRouter } from './routes/webhook';
+import { smarthomeRouter } from './routes/smarthome';
 import { errorHandler } from './middleware/error';
 
 const app = express();
 
-// Webhook route needs raw body for HMAC verification
+// HMAC webhook — must receive the raw body for signature verification.
+// Registered before express.json() so the buffer is not consumed first.
 app.use('/webhook/google-home', express.raw({ type: 'application/json' }), webhookRouter);
 
 app.use(express.json());
+
+// Smart Home webhook uses JWT Bearer auth (no HMAC), so standard JSON parsing is fine.
+app.use('/webhook/smarthome', smarthomeRouter);
+
 app.use('/feed', feedRouter);
 app.use('/internal', internalRouter);
 
