@@ -141,6 +141,29 @@ function notConfigured(res: Response) {
   });
 }
 
+// Per RFC 6749 §2.3.1, clients may authenticate either by putting client_id/
+// client_secret in the request body, or via an "Authorization: Basic
+// base64(client_id:client_secret)" header. The Google Home console has a
+// toggle for which one it uses — support both so either setting works.
+function getClientCredentials(req: Request): { clientId?: string; clientSecret?: string } {
+  const auth = req.headers['authorization'];
+  if (typeof auth === 'string' && auth.startsWith('Basic ')) {
+    try {
+      const decoded = Buffer.from(auth.slice(6), 'base64').toString('utf8');
+      const sep = decoded.indexOf(':');
+      if (sep === -1) return {};
+      return {
+        clientId:     decodeURIComponent(decoded.slice(0, sep)),
+        clientSecret: decodeURIComponent(decoded.slice(sep + 1)),
+      };
+    } catch {
+      return {};
+    }
+  }
+  const body = req.body as Record<string, string>;
+  return { clientId: body.client_id, clientSecret: body.client_secret };
+}
+
 // ── GET /oauth/authorize ──────────────────────────────────────────────────────
 // Google redirects the user here to start the account-linking flow.
 oauthRouter.get('/authorize', (req: Request, res: Response) => {
@@ -227,13 +250,16 @@ oauthRouter.post('/authorize', async (req: Request, res: Response) => {
 oauthRouter.post('/token', async (req: Request, res: Response) => {
   if (!config.GOOGLE_HOME_OAUTH_CLIENT_ID) return notConfigured(res);
 
-  const { grant_type, code, refresh_token, client_id, client_secret, redirect_uri } =
+  const { grant_type, code, refresh_token, redirect_uri } =
     req.body as Record<string, string>;
 
-  // Authenticate the OAuth client (Google sends credentials in the POST body).
+  // Authenticate the OAuth client — Google sends credentials either in the
+  // POST body or via an "Authorization: Basic" header, depending on the
+  // "transmit via HTTP basic auth" toggle in the Home console.
+  const { clientId, clientSecret } = getClientCredentials(req);
   if (
-    client_id     !== config.GOOGLE_HOME_OAUTH_CLIENT_ID ||
-    client_secret !== config.GOOGLE_HOME_OAUTH_CLIENT_SECRET
+    clientId     !== config.GOOGLE_HOME_OAUTH_CLIENT_ID ||
+    clientSecret !== config.GOOGLE_HOME_OAUTH_CLIENT_SECRET
   ) {
     return res.status(401).json({ error: 'invalid_client' });
   }
