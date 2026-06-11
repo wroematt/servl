@@ -9,6 +9,7 @@ import { resolvePhotoUrl } from '@/lib/utils';
 import { useAuth } from '@/providers/AuthProvider';
 import { IconCamera, IconCopy } from '@tabler/icons-react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -347,6 +348,27 @@ export default function AccountPage() {
             );
           })}
         </div>
+      </Card>
+
+      {/* Support */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Support</CardTitle>
+        </CardHeader>
+        <p className="text-sm text-text-secondary">
+          Need help or have feedback? Get in touch at{' '}
+          <a href="mailto:contact@servl.uk" className="text-primary hover:underline">
+            contact@servl.uk
+          </a>
+          .
+        </p>
+        <p className="mt-2 text-sm text-text-secondary">
+          Read our{' '}
+          <Link href="/PrivacyPolicy" className="text-primary hover:underline">
+            Privacy Policy
+          </Link>
+          .
+        </p>
       </Card>
 
       {/* Sign out */}
