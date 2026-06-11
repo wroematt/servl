@@ -18,6 +18,21 @@ app.use(helmet({
   // images and data from the API (port 3000). Helmet's default 'same-origin'
   // policy would cause the browser to block cross-origin <img> loads silently.
   crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: {
+    directives: {
+      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+      // The OAuth login form (/oauth/authorize) redirects cross-origin to
+      // Google's account-linking redirect endpoint after a successful submit.
+      // Chrome enforces form-action against the redirect target of a form
+      // submission too, so the default 'self' silently blocks that
+      // navigation — no follow-up request, no error, page just sits there.
+      formAction: [
+        "'self'",
+        'https://oauth-redirect.googleusercontent.com',
+        'https://oauth-redirect-sandbox.googleusercontent.com',
+      ],
+    },
+  },
 }));
 
 // ── CORS ──────────────────────────────────────
