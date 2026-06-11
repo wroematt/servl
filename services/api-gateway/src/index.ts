@@ -26,7 +26,7 @@ app.use(helmet({
       // Chrome enforces form-action against the redirect target of a form
       // submission too, so the default 'self' silently blocks that
       // navigation — no follow-up request, no error, page just sits there.
-      formAction: [
+      'form-action': [
         "'self'",
         'https://oauth-redirect.googleusercontent.com',
         'https://oauth-redirect-sandbox.googleusercontent.com',
