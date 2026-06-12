@@ -13,6 +13,14 @@ const app = express();
 // correctly identify clients from the X-Forwarded-For header.
 app.set('trust proxy', 1);
 
+// TEMPORARY DIAGNOSTIC: log every incoming request (method, path, user-agent
+// only — no headers that could carry secrets) to confirm whether Google's
+// account-linking requests ever reach the gateway. Remove once resolved.
+app.use((req, _res, next) => {
+  console.log(`[req] ${req.method} ${req.originalUrl} ua="${req.headers['user-agent'] ?? ''}"`);
+  next();
+});
+
 app.use(helmet({
   // The gateway is intentionally cross-origin: the website (port 3006) loads
   // images and data from the API (port 3000). Helmet's default 'same-origin'
