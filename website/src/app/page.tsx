@@ -94,8 +94,8 @@ export default function HomePage() {
           <div className="order-first lg:order-last">
             <Image
               src="/images/hero-pet.png"
-              alt="A golden retriever relaxing in a calm, minimalist living room"
-              width={505}
+              alt="A grey cat sitting on a windowsill in a bright, minimalist room"
+              width={510}
               height={509}
               priority
               className="mx-auto w-full max-w-md rounded-2xl object-cover shadow-sm"
