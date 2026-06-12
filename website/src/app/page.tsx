@@ -42,9 +42,9 @@ const features = [
 ];
 
 const gallery = [
-  { src: '/images/gallery-cat-1.png', alt: 'A tabby cat in a bright, minimalist hallway' },
-  { src: '/images/gallery-dog-2.png', alt: 'A poodle puppy sitting in a calm dining room' },
-  { src: '/images/gallery-cat-3.png', alt: 'A tabby cat sitting on a woven rug' },
+  { src: '/images/gallery-cat-2.png', alt: 'A grey cat sitting on a windowsill in a bright, minimalist room' },
+  { src: '/images/gallery-dog-1.png', alt: 'A golden retriever relaxing in a calm, minimalist living room' },
+  { src: '/images/gallery-dog-3.png', alt: 'A dog resting in a bed in a bright kitchen with a potted olive tree' },
 ];
 
 const navButton = 'inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50';
@@ -94,8 +94,8 @@ export default function HomePage() {
           <div className="order-first lg:order-last">
             <Image
               src="/images/hero-pet.png"
-              alt="A grey cat sitting on a windowsill in a bright, minimalist room"
-              width={510}
+              alt="A grey and tabby cat sitting on a woven rug"
+              width={505}
               height={509}
               priority
               className="mx-auto w-full max-w-md rounded-2xl object-cover shadow-sm"
