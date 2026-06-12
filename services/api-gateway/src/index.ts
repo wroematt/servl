@@ -14,10 +14,20 @@ const app = express();
 app.set('trust proxy', 1);
 
 // TEMPORARY DIAGNOSTIC: log every incoming request (method, path, user-agent
-// only — no headers that could carry secrets) to confirm whether Google's
-// account-linking requests ever reach the gateway. Remove once resolved.
-app.use((req, _res, next) => {
+// only — no headers that could carry secrets) plus the response status and,
+// for redirects, the target path (query stripped — may contain an auth code)
+// to confirm whether Google's account-linking requests reach the gateway and
+// what the /oauth/authorize flow returns. Remove once resolved.
+app.use((req, res, next) => {
   console.log(`[req] ${req.method} ${req.originalUrl} ua="${req.headers['user-agent'] ?? ''}"`);
+  res.on('finish', () => {
+    let redirect = '';
+    const loc = res.getHeader('location');
+    if (typeof loc === 'string') {
+      redirect = ` -> ${loc.split('?')[0]}`;
+    }
+    console.log(`[res] ${req.method} ${req.path} ${res.statusCode}${redirect}`);
+  });
   next();
 });
 
