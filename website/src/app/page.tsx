@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 import {
   IconBellRinging,
@@ -40,6 +41,12 @@ const features = [
   },
 ];
 
+const gallery = [
+  { src: '/images/gallery-cat-1.png', alt: 'A tabby cat in a bright, minimalist hallway' },
+  { src: '/images/gallery-dog-2.png', alt: 'A poodle puppy sitting in a calm dining room' },
+  { src: '/images/gallery-cat-3.png', alt: 'A tabby cat sitting on a woven rug' },
+];
+
 const navButton = 'inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50';
 
 export default function HomePage() {
@@ -63,22 +70,37 @@ export default function HomePage() {
       </header>
 
       {/* Hero */}
-      <section className="mx-auto max-w-3xl px-4 py-16 text-center sm:py-24">
-        <img src="/servl-logo.svg" alt="Servl" width={120} className="mx-auto mb-6" />
-        <h1 className="text-3xl font-semibold text-text sm:text-4xl">
-          Automated feeding for happier pets
-        </h1>
-        <p className="mx-auto mt-4 max-w-xl text-text-secondary">
-          Servl is a Wi-Fi connected pet feeder that dispenses precise portions of dry
-          food on schedule, on demand from the app, or with a simple voice command.
-        </p>
-        <div className="mt-8 flex justify-center gap-3">
-          <Link href="/register" className={`${navButton} px-5 py-2.5 text-base bg-primary text-white hover:bg-primary-hover`}>
-            Get started
-          </Link>
-          <Link href="/login" className={`${navButton} px-5 py-2.5 text-base border border-border-strong text-text hover:bg-border`}>
-            Log in
-          </Link>
+      <section className="mx-auto max-w-5xl px-4 py-16 sm:py-20">
+        <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
+          <div className="text-center lg:text-left">
+            <img src="/servl-logo.svg" alt="Servl" width={120} className="mx-auto mb-6 lg:mx-0" />
+            <h1 className="text-3xl font-semibold text-text sm:text-4xl">
+              Automated feeding for happier pets
+            </h1>
+            <p className="mx-auto mt-4 max-w-xl text-text-secondary lg:mx-0">
+              Servl is a Wi-Fi connected pet feeder that dispenses precise portions of
+              dry food on schedule, on demand from the app, or with a simple voice
+              command.
+            </p>
+            <div className="mt-8 flex justify-center gap-3 lg:justify-start">
+              <Link href="/register" className={`${navButton} px-5 py-2.5 text-base bg-primary text-white hover:bg-primary-hover`}>
+                Get started
+              </Link>
+              <Link href="/login" className={`${navButton} px-5 py-2.5 text-base border border-border-strong text-text hover:bg-border`}>
+                Log in
+              </Link>
+            </div>
+          </div>
+          <div className="order-first lg:order-last">
+            <Image
+              src="/images/hero-pet.png"
+              alt="A golden retriever relaxing in a calm, minimalist living room"
+              width={505}
+              height={509}
+              priority
+              className="mx-auto w-full max-w-md rounded-2xl object-cover shadow-sm"
+            />
+          </div>
         </div>
       </section>
 
@@ -98,13 +120,25 @@ export default function HomePage() {
       </section>
 
       {/* About */}
-      <section className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
+      <section className="mx-auto max-w-5xl px-4 py-8 sm:py-12">
         <h2 className="text-lg font-semibold text-text">About Servl</h2>
-        <p className="mt-3 text-sm leading-relaxed text-text-secondary">
+        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-text-secondary">
           Servl pairs a Wi-Fi connected hardware feeder with an Android app and this
           web dashboard, so you can manage feeding schedules, monitor hopper levels,
           and review feed history for every pet in your household — from anywhere.
         </p>
+        <div className="mt-6 grid grid-cols-3 gap-3 sm:gap-4">
+          {gallery.map(({ src, alt }) => (
+            <Image
+              key={src}
+              src={src}
+              alt={alt}
+              width={505}
+              height={509}
+              className="aspect-square w-full rounded-xl object-cover"
+            />
+          ))}
+        </div>
       </section>
 
       {/* Footer */}
