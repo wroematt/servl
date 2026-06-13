@@ -90,7 +90,7 @@ export async function reportState(
   });
 
   if (!response.ok) {
-    console.error(`[homegraph] reportStateAndNotification failed: HTTP ${response.status}`);
+    console.error(`[homegraph] reportStateAndNotification failed: HTTP ${response.status} ${await response.text()}`);
   } else {
     console.log(`[homegraph] reportState ok: device=${deviceId}`);
   }
