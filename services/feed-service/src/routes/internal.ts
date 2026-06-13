@@ -124,7 +124,10 @@ internalRouter.post('/report-state', async (req: Request, res: Response) => {
     last_dispensed_g: number | null;
   }>(
     `SELECT p.id AS pet_id, p.household_id, d.status AS device_status, d.hopper_pct,
-            (SELECT COALESCE(fe.weight_dispensed_g, fe.weight_requested_g)
+            -- NULLIF(..., 0): the hopper load cell isn't wired yet (TaskList #11), so
+            -- firmware reports dispensed_g=0 on every confirmed feed. Treat that as
+            -- "unmeasured" and fall back to the requested weight, same as NULL.
+            (SELECT COALESCE(NULLIF(fe.weight_dispensed_g, 0), fe.weight_requested_g)
              FROM   feed_events fe
              WHERE  fe.pet_id = p.id
              ORDER BY fe.dispensed_at DESC
