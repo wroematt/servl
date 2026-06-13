@@ -90,6 +90,30 @@ async function handleButtonPress(deviceId: string, msg: { feed_type?: string }) 
   }
 }
 
+// ── Google Home Report State ──────────────────────────────────────────────
+// Notifies feed-service that this device's state changed so it can push a
+// Report State update to Home Graph (see feed-service
+// /internal/report-state and lib/homegraph.ts). Best-effort and silent —
+// Report State is an enhancement on top of SYNC/QUERY/EXECUTE, never
+// required for them, and feed-service itself no-ops if Home Graph isn't
+// configured.
+async function reportStateToGoogleHome(deviceId: string) {
+  if (!config.FEED_SERVICE_URL) return;
+
+  try {
+    const response = await fetch(`${config.FEED_SERVICE_URL}/internal/report-state`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device_id: deviceId }),
+    });
+    if (!response.ok) {
+      console.error(`[mqtt] report-state request failed for device ${deviceId}: HTTP ${response.status}`);
+    }
+  } catch (err) {
+    console.error(`[mqtt] report-state request error for device ${deviceId}:`, err);
+  }
+}
+
 async function handleStatusMessage(deviceId: string, msg: MqttStatusPayload) {
   // 1. Update device telemetry.
   // LWT messages (broker-generated on unexpected disconnect) have status='offline'.
@@ -100,6 +124,7 @@ async function handleStatusMessage(deviceId: string, msg: MqttStatusPayload) {
       `UPDATE devices SET status = 'offline' WHERE id = $1`,
       [deviceId],
     );
+    reportStateToGoogleHome(deviceId);
     return;
   }
 
@@ -142,6 +167,13 @@ async function handleStatusMessage(deviceId: string, msg: MqttStatusPayload) {
     throw err;
   } finally {
     txClient.release();
+  }
+
+  // Push a Report State update to Google Home only when something a voice
+  // query would care about actually changed (came back online, or the
+  // hopper level moved) — avoids a Home Graph call on every 30s heartbeat.
+  if (wasOffline || prevHopperPct !== msg.hopper_pct) {
+    reportStateToGoogleHome(deviceId);
   }
 
   // TEMP DIAGNOSTIC — remove once the repeat-notification issue is root-caused.
