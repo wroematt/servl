@@ -5,14 +5,18 @@ import {
   IconBellRinging,
   IconBrandGoogle,
   IconCalendarTime,
+  IconMail,
   IconUsers,
 } from '@tabler/icons-react';
 
 export const metadata: Metadata = {
   title: 'Servl — Smart Pet Feeder',
   description:
-    'Servl is a Wi-Fi connected automatic pet feeder with an Android app, web dashboard, and Google Home voice control.',
+    'Servl is a Wi-Fi connected automatic pet feeder with an Android app, web dashboard, and Google Home voice control. Currently in private beta — register your interest in testing.',
 };
+
+const BETA_EMAIL = 'contact@servl.uk';
+const BETA_EMAIL_HREF = 'mailto:contact@servl.uk?subject=Beta%20tester%20interest';
 
 const features = [
   {
@@ -54,6 +58,14 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-bg">
+      {/* Beta banner */}
+      <div className="bg-primary px-4 py-2 text-center text-xs font-medium text-white sm:text-sm">
+        Servl pet feeders aren&apos;t available to buy yet — we&apos;re running a private beta.{' '}
+        <a href={BETA_EMAIL_HREF} className="underline underline-offset-2 hover:no-underline">
+          Register your interest
+        </a>
+      </div>
+
       {/* Nav */}
       <header className="border-b border-border bg-surface">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
@@ -62,9 +74,9 @@ export default function HomePage() {
             <Link href="/login" className={`${navButton} border border-border-strong text-text hover:bg-border`}>
               Log in
             </Link>
-            <Link href="/register" className={`${navButton} bg-primary text-white hover:bg-primary-hover`}>
-              Sign up
-            </Link>
+            <a href={BETA_EMAIL_HREF} className={`${navButton} bg-primary text-white hover:bg-primary-hover`}>
+              Register interest
+            </a>
           </div>
         </div>
       </header>
@@ -74,18 +86,23 @@ export default function HomePage() {
         <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
           <div className="text-center lg:text-left">
             <img src="/servl-logo.svg" alt="Servl" width={120} className="mx-auto mb-6 lg:mx-0" />
+            <span className="mb-4 inline-flex items-center rounded-full bg-primary-light px-3 py-1 text-xs font-medium text-primary">
+              Private beta — coming soon
+            </span>
             <h1 className="text-3xl font-semibold text-text sm:text-4xl">
               Automated feeding for happier pets
             </h1>
             <p className="mx-auto mt-4 max-w-xl text-text-secondary lg:mx-0">
               Servl is a Wi-Fi connected pet feeder that dispenses precise portions of
               dry food on schedule, on demand from the app, or with a simple voice
-              command.
+              command. We&apos;re not on sale yet — we&apos;re putting the finishing
+              touches on the hardware and recruiting a small group of beta testers to
+              try it at home.
             </p>
-            <div className="mt-8 flex justify-center gap-3 lg:justify-start">
-              <Link href="/register" className={`${navButton} px-5 py-2.5 text-base bg-primary text-white hover:bg-primary-hover`}>
-                Get started
-              </Link>
+            <div className="mt-8 flex flex-wrap justify-center gap-3 lg:justify-start">
+              <a href={BETA_EMAIL_HREF} className={`${navButton} px-5 py-2.5 text-base bg-primary text-white hover:bg-primary-hover`}>
+                Register interest
+              </a>
               <Link href="/login" className={`${navButton} px-5 py-2.5 text-base border border-border-strong text-text hover:bg-border`}>
                 Log in
               </Link>
@@ -127,6 +144,12 @@ export default function HomePage() {
           web dashboard, so you can manage feeding schedules, monitor hopper levels,
           and review feed history for every pet in your household — from anywhere.
         </p>
+        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-text-secondary">
+          We design and build connected smart-home devices for pet care. The Servl
+          feeder is our first product — a Wi-Fi connected hardware device with
+          Google Home voice control built in from day one, and more smart-home
+          integrations planned for the future.
+        </p>
         <div className="mt-6 grid grid-cols-3 gap-3 sm:gap-4">
           {gallery.map(({ src, alt }) => (
             <Image
@@ -138,6 +161,28 @@ export default function HomePage() {
               className="aspect-square w-full rounded-xl object-cover"
             />
           ))}
+        </div>
+      </section>
+
+      {/* Beta CTA */}
+      <section className="mx-auto max-w-5xl px-4 py-8 sm:py-12">
+        <div className="rounded-2xl border border-border bg-primary-light px-6 py-10 text-center sm:px-12">
+          <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-surface text-primary">
+            <IconMail size={20} />
+          </div>
+          <h2 className="text-lg font-semibold text-text">Want to try Servl first?</h2>
+          <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-text-secondary">
+            Servl feeders aren&apos;t available to buy yet. We&apos;re looking for a
+            small group of beta testers to try Servl at home and help us shape the
+            product before launch. If that&apos;s you, email{' '}
+            <a href={BETA_EMAIL_HREF} className="font-medium text-primary hover:underline">
+              {BETA_EMAIL}
+            </a>{' '}
+            to register your interest.
+          </p>
+          <a href={BETA_EMAIL_HREF} className={`${navButton} mt-6 px-5 py-2.5 text-base bg-primary text-white hover:bg-primary-hover`}>
+            Register interest
+          </a>
         </div>
       </section>
 
