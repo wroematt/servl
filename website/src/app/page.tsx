@@ -18,6 +18,11 @@ export const metadata: Metadata = {
 const BETA_EMAIL = 'contact@servl.uk';
 const BETA_EMAIL_HREF = 'mailto:contact@servl.uk?subject=Beta%20tester%20interest';
 
+// The dashboard app is served from app.servl.uk (the API gateway's CORS_ORIGIN
+// only allows that origin), so links to it from this marketing page must be
+// absolute rather than relative paths on this domain.
+const APP_LOGIN_URL = 'https://app.servl.uk/login';
+
 const features = [
   {
     icon: IconCalendarTime,
@@ -71,9 +76,9 @@ export default function HomePage() {
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
           <img src="/servl-logo-banner.svg" alt="Servl" className="h-7 w-auto" />
           <div className="flex items-center gap-2">
-            <Link href="/login" className={`${navButton} border border-border-strong text-text hover:bg-border`}>
+            <a href={APP_LOGIN_URL} className={`${navButton} border border-border-strong text-text hover:bg-border`}>
               Log in
-            </Link>
+            </a>
             <a href={BETA_EMAIL_HREF} className={`${navButton} bg-primary text-white hover:bg-primary-hover`}>
               Register interest
             </a>
@@ -103,9 +108,9 @@ export default function HomePage() {
               <a href={BETA_EMAIL_HREF} className={`${navButton} px-5 py-2.5 text-base bg-primary text-white hover:bg-primary-hover`}>
                 Register interest
               </a>
-              <Link href="/login" className={`${navButton} px-5 py-2.5 text-base border border-border-strong text-text hover:bg-border`}>
+              <a href={APP_LOGIN_URL} className={`${navButton} px-5 py-2.5 text-base border border-border-strong text-text hover:bg-border`}>
                 Log in
-              </Link>
+              </a>
             </div>
           </div>
           <div className="order-first lg:order-last">
