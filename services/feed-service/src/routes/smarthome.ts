@@ -220,15 +220,25 @@ smarthomeRouter.post('/', async (req: Request, res: Response) => {
     const qPayload = payload as { devices: Array<{ id: string }> };
     const allIds = (qPayload?.devices ?? []).map((d) => d.id);
 
-    // Scene devices (Feed Meal / Feed Snack buttons) have no real state —
-    // they're one-shot triggers, not PETFEEDER rows — so split them out
-    // before the pets lookup (their IDs aren't valid pet UUIDs).
+    // Scene devices (Feed Meal / Feed Snack buttons) aren't PETFEEDER rows
+    // themselves, but their online status mirrors the feeder they dispatch
+    // to — if the feeder is offline, tapping "Feed Meal" can't do anything
+    // either. Resolve each scene device back to its underlying pet so the
+    // single query below covers both.
     const sceneIds: string[] = [];
     const petIds: string[] = [];
+    const scenePetIds = new Set<string>();
     for (const id of allIds) {
-      if (parseSceneDeviceId(id)) sceneIds.push(id);
-      else petIds.push(id);
+      const scene = parseSceneDeviceId(id);
+      if (scene) {
+        sceneIds.push(id);
+        scenePetIds.add(scene.petId);
+      } else {
+        petIds.push(id);
+      }
     }
+
+    const lookupIds = Array.from(new Set([...petIds, ...scenePetIds]));
 
     const { rows } = await db.query<{
       id: string;
@@ -250,7 +260,7 @@ smarthomeRouter.post('/', async (req: Request, res: Response) => {
        WHERE  p.id = ANY($1::uuid[])
          AND  p.household_id = $2
          AND  p.deleted_at IS NULL`,
-      [petIds, auth.householdId],
+      [lookupIds, auth.householdId],
     );
 
     const states: Record<string, unknown> = {};
@@ -266,7 +276,9 @@ smarthomeRouter.post('/', async (req: Request, res: Response) => {
       };
     }
     for (const sceneId of sceneIds) {
-      states[sceneId] = { status: 'SUCCESS', online: true };
+      const scene = parseSceneDeviceId(sceneId)!;
+      const pet = rows.find((r) => r.id === scene.petId);
+      states[sceneId] = { status: 'SUCCESS', online: pet?.device_status === 'online' };
     }
 
     return res.json({ requestId, payload: { devices: states } });
