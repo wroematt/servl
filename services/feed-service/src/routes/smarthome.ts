@@ -341,7 +341,10 @@ smarthomeRouter.post('/', async (req: Request, res: Response) => {
 
           const weightG = scene.preset === 'snack' ? pet.snack_weight_g : pet.meal_weight_g;
           if (!weightG || weightG <= 0) {
-            results.push({ ids: [id], status: 'ERROR', errorCode: 'notConfigured' });
+            // 'notConfigured' isn't a code Google recognizes — it falls back to a
+            // generic "unable to interact with your physical appliances" message.
+            // actionNotAvailable maps to "Sorry, I can't seem to do that right now."
+            results.push({ ids: [id], status: 'ERROR', errorCode: 'actionNotAvailable' });
             continue;
           }
 
@@ -429,8 +432,11 @@ smarthomeRouter.post('/', async (req: Request, res: Response) => {
 
         const weightG = customWeightG ?? (presetType === 'snack' ? pet.snack_weight_g : pet.meal_weight_g);
         if (!weightG || weightG <= 0) {
-          // Feed weights haven't been configured in the app yet.
-          results.push({ ids: [petId], status: 'ERROR', errorCode: 'notConfigured' });
+          // Feed weights haven't been configured in the app yet. 'notConfigured'
+          // isn't a code Google recognizes — it falls back to a generic "unable
+          // to interact with your physical appliances" message. actionNotAvailable
+          // maps to "Sorry, I can't seem to do that right now."
+          results.push({ ids: [petId], status: 'ERROR', errorCode: 'actionNotAvailable' });
           continue;
         }
 
