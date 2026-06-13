@@ -13,7 +13,11 @@ const schema = z.object({
   // lib/homegraph.ts. Both optional; leave unset to disable Report State
   // (SYNC/QUERY/EXECUTE work without it).
   HOMEGRAPH_CLIENT_EMAIL: z.string().optional(),
-  HOMEGRAPH_PRIVATE_KEY: z.string().optional(),
+  // The private_key field from the downloaded service-account JSON contains
+  // literal "\n" escapes; .env files don't interpret those, so they arrive
+  // here as literal backslash-n. jwt.sign() needs a real PEM with actual
+  // line breaks, so convert them.
+  HOMEGRAPH_PRIVATE_KEY: z.string().optional().transform((v) => v?.replace(/\\n/g, '\n')),
 });
 
 export const config = schema.parse(process.env);

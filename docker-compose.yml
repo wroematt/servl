@@ -191,6 +191,10 @@ services:
       # JWT_SECRET lets feed-service verify OAuth access tokens issued by user-service
       # directly, without an extra HTTP call per voice command.
       - JWT_SECRET=${JWT_SECRET}
+      # Home Graph service account — enables Report State and Request Sync
+      # (see lib/homegraph.ts). Optional; leave unset in .env to disable both.
+      - HOMEGRAPH_CLIENT_EMAIL=${HOMEGRAPH_CLIENT_EMAIL:-}
+      - HOMEGRAPH_PRIVATE_KEY=${HOMEGRAPH_PRIVATE_KEY:-}
     networks:
       - internal
     depends_on:
