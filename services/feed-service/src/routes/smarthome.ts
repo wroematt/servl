@@ -168,6 +168,7 @@ function buildSceneDevice(pet: PetRow, preset: ScenePreset) {
 smarthomeRouter.post('/', async (req: Request, res: Response) => {
   const auth = verifyToken(req);
   if (!auth) {
+    console.warn('[smarthome] rejected request: missing or invalid Bearer token');
     return res.status(401).json({ error: 'invalid_token' });
   }
 
@@ -183,6 +184,7 @@ smarthomeRouter.post('/', async (req: Request, res: Response) => {
   }
 
   const { intent, payload } = input;
+  console.log(`[smarthome] ${intent} requestId=${requestId} household=${auth.householdId}`);
 
   // ── SYNC ────────────────────────────────────────────────────────────────────
   // Return all pets as PETFEEDER devices. Called when the user first links
@@ -463,6 +465,7 @@ smarthomeRouter.post('/', async (req: Request, res: Response) => {
       }
     }
 
+    console.log(`[smarthome] EXECUTE results requestId=${requestId}`, JSON.stringify(results));
     return res.json({ requestId, payload: { commands: results } });
   }
 
