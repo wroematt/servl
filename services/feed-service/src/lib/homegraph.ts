@@ -19,6 +19,7 @@ import { config } from '../config';
 
 const TOKEN_URL       = 'https://oauth2.googleapis.com/token';
 const REPORT_URL      = 'https://homegraph.googleapis.com/v1/devices:reportStateAndNotification';
+const REQUEST_SYNC_URL = 'https://homegraph.googleapis.com/v1/devices:requestSync';
 const HOMEGRAPH_SCOPE = 'https://www.googleapis.com/auth/homegraph';
 
 let cachedToken: { accessToken: string; expiresAt: number } | null = null;
@@ -90,5 +91,26 @@ export async function reportState(
 
   if (!response.ok) {
     console.error(`[homegraph] reportStateAndNotification failed: HTTP ${response.status}`);
+  }
+}
+
+// Tells Google a linked user's device list has changed (a pet was added or
+// removed) so HomeGraph re-runs SYNC immediately instead of waiting for the
+// user to manually re-sync.
+export async function requestSync(agentUserId: string): Promise<void> {
+  const accessToken = await getAccessToken();
+  if (!accessToken) return;
+
+  const response = await fetch(REQUEST_SYNC_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'Authorization': `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ agentUserId }),
+  });
+
+  if (!response.ok) {
+    console.error(`[homegraph] requestSync failed: HTTP ${response.status}`);
   }
 }

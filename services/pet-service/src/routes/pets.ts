@@ -4,6 +4,7 @@ import { z } from 'zod';
 import path from 'path';
 import { db } from '../lib/db';
 import { upload } from '../lib/upload';
+import { requestHomeGraphSync } from '../lib/homegraph';
 
 export const petsRouter = Router();
 
@@ -106,6 +107,7 @@ petsRouter.post('/', upload.single('photo'), async (req: Request, res: Response)
     }
     throw err;
   }
+  requestHomeGraphSync(householdId);
   return res.status(201).json(result.rows[0]);
 });
 
@@ -229,6 +231,7 @@ petsRouter.delete('/:petId', async (req: Request, res: Response) => {
     [req.params.petId, householdId],
   );
   if (!result.rows[0]) return res.status(404).json({ code: 'NOT_FOUND', message: 'Pet not found' });
+  requestHomeGraphSync(householdId);
   return res.status(204).send();
 });
 

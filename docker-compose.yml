@@ -123,6 +123,9 @@ services:
       - PORT=3002
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - MEDIA_UPLOAD_PATH=/uploads
+      # Lets pet-service trigger a Home Graph requestSync (via feed-service)
+      # when a pet is added or removed — see lib/homegraph.ts.
+      - FEED_SERVICE_URL=http://feed-service:3005
     volumes:
       - media_uploads:/uploads
     networks:
@@ -130,6 +133,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      feed-service:
+        condition: service_started
 
   # ── DEVICE SERVICE ─────────────────────────
   device-service:

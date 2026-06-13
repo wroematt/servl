@@ -5,7 +5,7 @@ import { db } from '../lib/db';
 import { createDispense } from '../lib/dispense';
 import { AppError } from '../lib/errors';
 import { buildDeviceState } from '../lib/devicestate';
-import { reportState } from '../lib/homegraph';
+import { reportState, requestSync } from '../lib/homegraph';
 
 export const internalRouter = Router();
 
@@ -150,4 +150,40 @@ internalRouter.post('/report-state', async (req: Request, res: Response) => {
   }
 
   return res.status(200).json({ reported: true, recipients: users.rows.length });
+});
+
+// ── POST /internal/request-sync (called by pet-service when a pet is added
+//    or removed) ──
+//
+// Each pet is a SYNC-level PETFEEDER device (see smarthome.ts buildDevice()),
+// so adding/removing a pet changes the device list Google's SYNC response
+// returns. Calls Home Graph requestSync for every Google account linked to
+// the household so HomeGraph picks up the change immediately rather than
+// waiting for the next manual "Sync devices".
+
+const requestSyncSchema = z.object({
+  household_id: z.string().uuid(),
+});
+
+internalRouter.post('/request-sync', async (req: Request, res: Response) => {
+  const body = requestSyncSchema.safeParse(req.body);
+  if (!body.success) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'Invalid request', details: body.error.flatten() });
+  }
+  const { household_id } = body.data;
+
+  const users = await db.query<{ id: string }>(
+    `SELECT u.id
+     FROM   users u
+     JOIN   oauth_refresh_tokens ort ON ort.user_id = u.id
+     WHERE  u.household_id = $1
+     GROUP BY u.id`,
+    [household_id],
+  );
+
+  for (const user of users.rows) {
+    await requestSync(user.id);
+  }
+
+  return res.status(200).json({ requested: true, recipients: users.rows.length });
 });
