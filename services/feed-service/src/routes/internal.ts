@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { db } from '../lib/db';
 import { createDispense } from '../lib/dispense';
 import { AppError } from '../lib/errors';
+import { buildDeviceState } from '../lib/devicestate';
+import { reportState } from '../lib/homegraph';
 
 export const internalRouter = Router();
 
@@ -90,4 +92,62 @@ internalRouter.post('/button-press', async (req: Request, res: Response) => {
     }
     throw err;
   }
+});
+
+// ── POST /internal/report-state (called by device-service on MQTT status
+//    changes) ──
+//
+// Pushes the device's current Dispense state to Google Home via Home Graph
+// "Report State" so the Google Home app and voice queries reflect hopper
+// level / online status without waiting for Google to poll QUERY. Builds the
+// same state shape as the smarthome QUERY handler (see lib/devicestate.ts)
+// and pushes it once per Google account linked to the device's household —
+// the idx_pets_one_per_device index guarantees at most one active pet per
+// device, so the lookup is unambiguous.
+
+const reportStateSchema = z.object({
+  device_id: z.string().uuid(),
+});
+
+internalRouter.post('/report-state', async (req: Request, res: Response) => {
+  const body = reportStateSchema.safeParse(req.body);
+  if (!body.success) {
+    return res.status(400).json({ code: 'VALIDATION_ERROR', message: 'Invalid request', details: body.error.flatten() });
+  }
+  const { device_id } = body.data;
+
+  const { rows } = await db.query<{
+    pet_id: string;
+    household_id: string;
+    device_status: string | null;
+    hopper_pct: number | null;
+  }>(
+    `SELECT p.id AS pet_id, p.household_id, d.status AS device_status, d.hopper_pct
+     FROM   pets p
+     JOIN   devices d ON d.id = p.device_id
+     WHERE  p.device_id = $1
+       AND  p.deleted_at IS NULL`,
+    [device_id],
+  );
+  const pet = rows[0];
+  if (!pet) {
+    return res.status(200).json({ reported: false, reason: 'NO_PET_ASSIGNED' });
+  }
+
+  const state = buildDeviceState(pet.device_status === 'online', pet.hopper_pct);
+
+  const users = await db.query<{ id: string }>(
+    `SELECT u.id
+     FROM   users u
+     JOIN   oauth_refresh_tokens ort ON ort.user_id = u.id
+     WHERE  u.household_id = $1
+     GROUP BY u.id`,
+    [pet.household_id],
+  );
+
+  for (const user of users.rows) {
+    await reportState(user.id, pet.pet_id, state);
+  }
+
+  return res.status(200).json({ reported: true, recipients: users.rows.length });
 });
