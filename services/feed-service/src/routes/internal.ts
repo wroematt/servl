@@ -121,8 +121,14 @@ internalRouter.post('/report-state', async (req: Request, res: Response) => {
     household_id: string;
     device_status: string | null;
     hopper_pct: number | null;
+    last_dispensed_g: number | null;
   }>(
-    `SELECT p.id AS pet_id, p.household_id, d.status AS device_status, d.hopper_pct
+    `SELECT p.id AS pet_id, p.household_id, d.status AS device_status, d.hopper_pct,
+            (SELECT COALESCE(fe.weight_dispensed_g, fe.weight_requested_g)
+             FROM   feed_events fe
+             WHERE  fe.pet_id = p.id
+             ORDER BY fe.dispensed_at DESC
+             LIMIT 1) AS last_dispensed_g
      FROM   pets p
      JOIN   devices d ON d.id = p.device_id
      WHERE  p.device_id = $1
@@ -134,7 +140,7 @@ internalRouter.post('/report-state', async (req: Request, res: Response) => {
     return res.status(200).json({ reported: false, reason: 'NO_PET_ASSIGNED' });
   }
 
-  const state = buildDeviceState(pet.device_status === 'online', pet.hopper_pct);
+  const state = buildDeviceState(pet.device_status === 'online', pet.hopper_pct, pet.last_dispensed_g ?? undefined);
 
   const users = await db.query<{ id: string }>(
     `SELECT u.id

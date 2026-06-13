@@ -171,8 +171,18 @@ smarthomeRouter.post('/', async (req: Request, res: Response) => {
     const qPayload = payload as { devices: Array<{ id: string }> };
     const petIds = (qPayload?.devices ?? []).map((d) => d.id);
 
-    const { rows } = await db.query<{ id: string; device_status: string | null; hopper_pct: number | null }>(
-      `SELECT p.id, d.status AS device_status, d.hopper_pct
+    const { rows } = await db.query<{
+      id: string;
+      device_status: string | null;
+      hopper_pct: number | null;
+      last_dispensed_g: number | null;
+    }>(
+      `SELECT p.id, d.status AS device_status, d.hopper_pct,
+              (SELECT COALESCE(fe.weight_dispensed_g, fe.weight_requested_g)
+               FROM   feed_events fe
+               WHERE  fe.pet_id = p.id
+               ORDER BY fe.dispensed_at DESC
+               LIMIT 1) AS last_dispensed_g
        FROM   pets p
        LEFT JOIN devices d ON d.id = p.device_id
        WHERE  p.id = ANY($1::uuid[])
@@ -186,13 +196,13 @@ smarthomeRouter.post('/', async (req: Request, res: Response) => {
       const pet = rows.find((r) => r.id === petId);
       states[petId] = {
         status: 'SUCCESS',
-        ...buildDeviceState(pet?.device_status === 'online', pet?.hopper_pct ?? null),
+        ...buildDeviceState(
+          pet?.device_status === 'online',
+          pet?.hopper_pct ?? null,
+          pet?.last_dispensed_g ?? undefined,
+        ),
       };
     }
-
-    // TEMPORARY DIAGNOSTIC: log the online state returned for each pet, to
-    // confirm what Google's OnlineOffline test sees. Remove once resolved.
-    console.log(`[smarthome] QUERY petIds=${JSON.stringify(petIds)} states=${JSON.stringify(states)}`);
 
     return res.json({ requestId, payload: { devices: states } });
   }
