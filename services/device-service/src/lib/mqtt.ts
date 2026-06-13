@@ -176,14 +176,6 @@ async function handleStatusMessage(deviceId: string, msg: MqttStatusPayload) {
     reportStateToGoogleHome(deviceId);
   }
 
-  // TEMP DIAGNOSTIC — remove once the repeat-notification issue is root-caused.
-  console.log(
-    `[mqtt][diag] device=${deviceId} prevStatus=${prevStatus} ` +
-    `prevHopperPct=${prevHopperPct} msg.hopper_pct=${msg.hopper_pct} msg.status=${msg.status} ` +
-    `wasOkBefore=${prevHopperPct >= 20} isNowLow=${msg.hopper_pct < 20 || msg.status === 'low_hopper'} ` +
-    `willNotify=${(msg.hopper_pct < 20 || msg.status === 'low_hopper') && prevHopperPct >= 20}`,
-  );
-
   // 1b. If the device just came back online, republish any feed commands that
   // arrived while it was offline (created within the last 2 hours to avoid
   // replaying very stale commands that may no longer be relevant).

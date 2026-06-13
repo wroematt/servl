@@ -137,10 +137,6 @@ smarthomeRouter.post('/', async (req: Request, res: Response) => {
 
   const { intent, payload } = input;
 
-  // TEMPORARY DIAGNOSTIC: log every Smart Home intent received, to confirm
-  // whether Google Home test/retest requests reach feed-service. Remove once resolved.
-  console.log(`[smarthome] intent=${intent} requestId=${requestId}`);
-
   // ── SYNC ────────────────────────────────────────────────────────────────────
   // Return all pets as PETFEEDER devices. Called when the user first links
   // their account and when Google refreshes ("Hey Google, sync my devices").
