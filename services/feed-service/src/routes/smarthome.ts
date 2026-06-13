@@ -23,6 +23,7 @@ import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { db } from '../lib/db';
 import { createDispense } from '../lib/dispense';
+import { buildDeviceState } from '../lib/devicestate';
 import { config } from '../config';
 
 export const smarthomeRouter = Router();
@@ -50,9 +51,14 @@ function verifyToken(req: Request): { userId: string; householdId: string } | nu
 // Each pet becomes a PETFEEDER device. The pet's UUID is the device ID — this
 // makes EXECUTE routing trivial (device ID → pet ID → look up weights).
 //
-// Two dispense items are registered per pet:
-//   "meal"  → maps to pets.meal_weight_g on EXECUTE
-//   "snack" → maps to pets.snack_weight_g on EXECUTE
+// The Dispense trait exposes a single item, "biscuits", in grams — this lets
+// users ask for a custom amount ("give Felix 30 grams of biscuits"). The
+// meal/snack portions configured in the app are exposed as dispense presets,
+// so "give Felix a meal" / "give Felix a snack" map to pets.meal_weight_g /
+// pets.snack_weight_g without the user specifying an amount.
+//
+// willReportState is true — see lib/homegraph.ts and /internal/report-state,
+// which push state changes (hopper level, online/offline) outside of QUERY.
 //
 // Synonyms are what Google uses for voice matching. Pet-type-aware food words
 // ("cat food", "dog food") improve recognition without needing a backend change.
@@ -66,10 +72,10 @@ type PetRow = {
 };
 
 function buildDevice(pet: PetRow) {
-  const mealSynonyms =
-    pet.type === 'cat' ? ['meal', 'food', 'cat food', 'kibble'] :
-    pet.type === 'dog' ? ['meal', 'food', 'dog food', 'kibble'] :
-                         ['meal', 'food', 'pet food'];
+  const biscuitSynonyms =
+    pet.type === 'cat' ? ['biscuits', 'food', 'cat food', 'kibble', 'dry food'] :
+    pet.type === 'dog' ? ['biscuits', 'food', 'dog food', 'kibble', 'dry food'] :
+                         ['biscuits', 'food', 'pet food', 'kibble', 'dry food'];
 
   return {
     id: pet.id,
@@ -80,7 +86,7 @@ function buildDevice(pet: PetRow) {
       name: pet.name,
       nicknames: [pet.name, `${pet.name}'s feeder`, `${pet.name} feeder`],
     },
-    willReportState: false,
+    willReportState: true,
     deviceInfo: {
       manufacturer: 'Servl',
       model: 'Smart Pet Feeder',
@@ -89,18 +95,22 @@ function buildDevice(pet: PetRow) {
     attributes: {
       supportedDispenseItems: [
         {
-          item_name: 'meal',
-          item_name_synonyms: [{ lang: 'en', synonyms: mealSynonyms }],
-          supported_units: ['NO_UNITS'],
-          default_portion: { amount: 1, unit: 'NO_UNITS' },
+          item_name: 'biscuits',
+          item_name_synonyms: [{ lang: 'en', synonyms: biscuitSynonyms }],
+          supported_units: ['GRAMS'],
+          default_portion: { amount: pet.meal_weight_g, unit: 'GRAMS' },
+        },
+      ],
+      supportedDispensePresets: [
+        {
+          preset_name: 'meal',
+          preset_name_synonyms: [{ lang: 'en', synonyms: ['meal', 'meals'] }],
         },
         {
-          item_name: 'snack',
-          item_name_synonyms: [
+          preset_name: 'snack',
+          preset_name_synonyms: [
             { lang: 'en', synonyms: ['snack', 'treat', 'snacks', 'treats'] },
           ],
-          supported_units: ['NO_UNITS'],
-          default_portion: { amount: 1, unit: 'NO_UNITS' },
         },
       ],
     },
@@ -161,8 +171,8 @@ smarthomeRouter.post('/', async (req: Request, res: Response) => {
     const qPayload = payload as { devices: Array<{ id: string }> };
     const petIds = (qPayload?.devices ?? []).map((d) => d.id);
 
-    const { rows } = await db.query<{ id: string; device_status: string | null }>(
-      `SELECT p.id, d.status AS device_status
+    const { rows } = await db.query<{ id: string; device_status: string | null; hopper_pct: number | null }>(
+      `SELECT p.id, d.status AS device_status, d.hopper_pct
        FROM   pets p
        LEFT JOIN devices d ON d.id = p.device_id
        WHERE  p.id = ANY($1::uuid[])
@@ -176,8 +186,7 @@ smarthomeRouter.post('/', async (req: Request, res: Response) => {
       const pet = rows.find((r) => r.id === petId);
       states[petId] = {
         status: 'SUCCESS',
-        online: pet?.device_status === 'online',
-        currentDispenseItems: [],
+        ...buildDeviceState(pet?.device_status === 'online', pet?.hopper_pct ?? null),
       };
     }
 
@@ -198,7 +207,7 @@ smarthomeRouter.post('/', async (req: Request, res: Response) => {
         devices:   Array<{ id: string }>;
         execution: Array<{
           command: string;
-          params:  { item?: string; amount?: number; unit?: string };
+          params:  { item?: string; amount?: number; unit?: string; presetName?: string };
         }>;
       }>;
     };
@@ -220,20 +229,48 @@ smarthomeRouter.post('/', async (req: Request, res: Response) => {
         continue;
       }
 
-      // item will be "meal" or "snack" as configured in supportedDispenseItems.
-      // Anything unrecognised defaults to meal.
-      const item = (exec.params.item ?? 'meal').toLowerCase();
-      const feedType: 'meal' | 'snack' = item === 'snack' ? 'snack' : 'meal';
+      // Either a preset ("give Felix a meal/snack" → supportedDispensePresets)
+      // or a custom amount in grams of the "biscuits" item
+      // ("give Felix 30 grams of biscuits" → supportedDispenseItems). No params
+      // at all ("feed Felix") defaults to the meal preset.
+      const { presetName, item, amount, unit } = exec.params;
+      let presetType: 'meal' | 'snack' | null = null;
+      let customWeightG: number | null = null;
+
+      if (presetName) {
+        const preset = presetName.toLowerCase();
+        if (preset !== 'meal' && preset !== 'snack') {
+          results.push({ ids: petIds, status: 'ERROR', errorCode: 'notSupported' });
+          continue;
+        }
+        presetType = preset;
+      } else if (item != null || amount != null) {
+        if (
+          (item ?? 'biscuits').toLowerCase() !== 'biscuits' ||
+          unit !== 'GRAMS' ||
+          !Number.isFinite(amount) ||
+          (amount as number) < 1 ||
+          (amount as number) > 500
+        ) {
+          results.push({ ids: petIds, status: 'ERROR', errorCode: 'notSupported' });
+          continue;
+        }
+        customWeightG = Math.round(amount as number);
+      } else {
+        presetType = 'meal';
+      }
 
       for (const petId of petIds) {
         // Look up the pet — enforce household scoping so one user cannot trigger
         // another household's feeder by guessing a pet UUID.
-        const { rows } = await db.query<PetRow>(
-          `SELECT id, name, device_id, meal_weight_g, snack_weight_g, type
-           FROM   pets
-           WHERE  id = $1
-             AND  household_id = $2
-             AND  deleted_at IS NULL`,
+        const { rows } = await db.query<PetRow & { device_status: string | null; hopper_pct: number | null }>(
+          `SELECT p.id, p.name, p.device_id, p.meal_weight_g, p.snack_weight_g, p.type,
+                  d.status AS device_status, d.hopper_pct
+           FROM   pets p
+           LEFT JOIN devices d ON d.id = p.device_id
+           WHERE  p.id = $1
+             AND  p.household_id = $2
+             AND  p.deleted_at IS NULL`,
           [petId, auth.householdId],
         );
         const pet = rows[0];
@@ -249,7 +286,7 @@ smarthomeRouter.post('/', async (req: Request, res: Response) => {
           continue;
         }
 
-        const weightG = feedType === 'snack' ? pet.snack_weight_g : pet.meal_weight_g;
+        const weightG = customWeightG ?? (presetType === 'snack' ? pet.snack_weight_g : pet.meal_weight_g);
         if (!weightG || weightG <= 0) {
           // Feed weights haven't been configured in the app yet.
           results.push({ ids: [petId], status: 'ERROR', errorCode: 'notConfigured' });
@@ -266,7 +303,7 @@ smarthomeRouter.post('/', async (req: Request, res: Response) => {
           results.push({
             ids:    [petId],
             status: 'SUCCESS',
-            states: { online: true, currentDispenseItems: [] },
+            states: buildDeviceState(true, pet.hopper_pct, weightG),
           });
         } catch (err: unknown) {
           const code = (err as { code?: string })?.code;
