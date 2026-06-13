@@ -155,17 +155,19 @@ smarthomeRouter.post('/', async (req: Request, res: Response) => {
 
   // ── QUERY ───────────────────────────────────────────────────────────────────
   // Google asks "is this device online?" before executing a command.
-  // A pet is considered online if it has a feeder device assigned.
+  // A pet is online only if it has a feeder assigned AND that feeder's last
+  // MQTT status/LWT marked it 'online' — mirrors what the app shows for the device.
   if (intent === 'action.devices.QUERY') {
     const qPayload = payload as { devices: Array<{ id: string }> };
     const petIds = (qPayload?.devices ?? []).map((d) => d.id);
 
-    const { rows } = await db.query<{ id: string; device_id: string | null }>(
-      `SELECT id, device_id
-       FROM   pets
-       WHERE  id = ANY($1::uuid[])
-         AND  household_id = $2
-         AND  deleted_at IS NULL`,
+    const { rows } = await db.query<{ id: string; device_status: string | null }>(
+      `SELECT p.id, d.status AS device_status
+       FROM   pets p
+       LEFT JOIN devices d ON d.id = p.device_id
+       WHERE  p.id = ANY($1::uuid[])
+         AND  p.household_id = $2
+         AND  p.deleted_at IS NULL`,
       [petIds, auth.householdId],
     );
 
@@ -174,7 +176,7 @@ smarthomeRouter.post('/', async (req: Request, res: Response) => {
       const pet = rows.find((r) => r.id === petId);
       states[petId] = {
         status: 'SUCCESS',
-        online: Boolean(pet?.device_id),
+        online: pet?.device_status === 'online',
         currentDispenseItems: [],
       };
     }
