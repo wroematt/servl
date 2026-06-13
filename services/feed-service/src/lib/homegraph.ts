@@ -91,6 +91,8 @@ export async function reportState(
 
   if (!response.ok) {
     console.error(`[homegraph] reportStateAndNotification failed: HTTP ${response.status}`);
+  } else {
+    console.log(`[homegraph] reportState ok: device=${deviceId}`);
   }
 }
 
@@ -112,5 +114,7 @@ export async function requestSync(agentUserId: string): Promise<void> {
 
   if (!response.ok) {
     console.error(`[homegraph] requestSync failed: HTTP ${response.status}`);
+  } else {
+    console.log(`[homegraph] requestSync ok: agentUserId=${agentUserId}`);
   }
 }

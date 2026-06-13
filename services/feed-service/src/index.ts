@@ -25,4 +25,8 @@ app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
 app.use(errorHandler);
 
-app.listen(config.PORT, () => console.log(`feed-service listening on :${config.PORT}`));
+app.listen(config.PORT, () => {
+  console.log(`feed-service listening on :${config.PORT}`);
+  const homeGraphEnabled = !!(config.HOMEGRAPH_CLIENT_EMAIL && config.HOMEGRAPH_PRIVATE_KEY);
+  console.log(`[homegraph] Report State / Request Sync ${homeGraphEnabled ? 'enabled' : 'disabled — HOMEGRAPH_CLIENT_EMAIL/HOMEGRAPH_PRIVATE_KEY not set'}`);
+});
