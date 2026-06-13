@@ -74,7 +74,7 @@ export default function HomePage() {
       {/* Nav */}
       <header className="border-b border-border bg-surface">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
-          <img src="/servl-logo-banner.svg" alt="Servl" className="h-7 w-auto" />
+          <img src="/servl-logo-banner.svg" alt="Servl" className="h-16 w-auto" />
           <div className="flex items-center gap-2">
             <a href={APP_LOGIN_URL} className={`${navButton} border border-border-strong text-text hover:bg-border`}>
               Log in
@@ -90,7 +90,6 @@ export default function HomePage() {
       <section className="mx-auto max-w-5xl px-4 py-16 sm:py-20">
         <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
           <div className="text-center lg:text-left">
-            <img src="/servl-logo.svg" alt="Servl" width={120} className="mx-auto mb-6 lg:mx-0" />
             <span className="mb-4 inline-flex items-center rounded-full bg-primary-light px-3 py-1 text-xs font-medium text-primary">
               Private beta — coming soon
             </span>
