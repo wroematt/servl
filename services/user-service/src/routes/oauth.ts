@@ -337,16 +337,17 @@ oauthRouter.post('/token', async (req: Request, res: Response) => {
       });
     }
 
-    // Rotate — delete the used token and issue a new pair.
-    await db.query('DELETE FROM oauth_refresh_tokens WHERE id = $1', [row.id]);
-    const newAccess  = issueOauthAccessToken(row.user_id, row.household_id, row.role);
-    const newRefresh = await issueOauthRefreshToken(row.user_id);
+    // Do NOT rotate the refresh token — Google's Smart Home Test Suite flags
+    // rotation as a footgun (Test#4, GalValidation): if Google retries with the
+    // old refresh token before it has durably persisted the new one, rotation
+    // locks the account out entirely. Just issue a fresh access token; the
+    // existing refresh token keeps working until it expires or DISCONNECT revokes it.
+    const newAccess = issueOauthAccessToken(row.user_id, row.household_id, row.role);
 
     return res.json({
-      access_token:  newAccess,
-      token_type:    'Bearer',
-      expires_in:    3600,
-      refresh_token: newRefresh,
+      access_token: newAccess,
+      token_type:   'Bearer',
+      expires_in:   3600,
     });
   }
 
