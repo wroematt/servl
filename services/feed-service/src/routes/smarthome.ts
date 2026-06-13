@@ -117,6 +117,53 @@ function buildDevice(pet: PetRow) {
   };
 }
 
+// ── Scene devices (Feed Meal / Feed Snack buttons) ──────────────────────────
+// Alongside each pet's PETFEEDER device, expose two SCENE devices so the
+// Google Home app shows tappable "Feed Meal" / "Feed Snack" buttons (Scene
+// devices render as a single-tap button; PETFEEDER alone gives no UI
+// control). sceneReversible: false marks these as one-shot triggers with no
+// on/off state — ActivateScene just dispatches the same createDispense() path
+// as the voice presets, using the pet's configured meal/snack weight.
+//
+// Device IDs are derived from the pet's UUID with a suffix
+// (`${petId}-meal-scene` / `${petId}-snack-scene`) so EXECUTE/QUERY can route
+// back to the pet without a separate lookup table.
+const SCENE_SUFFIXES = { meal: '-meal-scene', snack: '-snack-scene' } as const;
+type ScenePreset = keyof typeof SCENE_SUFFIXES;
+
+function parseSceneDeviceId(id: string): { petId: string; preset: ScenePreset } | null {
+  for (const preset of Object.keys(SCENE_SUFFIXES) as ScenePreset[]) {
+    const suffix = SCENE_SUFFIXES[preset];
+    if (id.endsWith(suffix)) {
+      return { petId: id.slice(0, -suffix.length), preset };
+    }
+  }
+  return null;
+}
+
+function buildSceneDevice(pet: PetRow, preset: ScenePreset) {
+  const label = preset === 'meal' ? 'Meal' : 'Snack';
+  return {
+    id: `${pet.id}${SCENE_SUFFIXES[preset]}`,
+    type: 'action.devices.types.SCENE',
+    traits: ['action.devices.traits.Scene'],
+    name: {
+      defaultNames: [`Feed ${pet.name} a ${preset}`],
+      name: `${pet.name} ${label}`,
+      nicknames: [`Feed ${pet.name} a ${preset}`, `${pet.name} ${label}`],
+    },
+    willReportState: false,
+    deviceInfo: {
+      manufacturer: 'Servl',
+      model: 'Smart Pet Feeder',
+      swVersion: '1.0',
+    },
+    attributes: {
+      sceneReversible: false,
+    },
+  };
+}
+
 // ── Webhook handler ───────────────────────────────────────────────────────────
 smarthomeRouter.post('/', async (req: Request, res: Response) => {
   const auth = verifyToken(req);
@@ -150,11 +197,17 @@ smarthomeRouter.post('/', async (req: Request, res: Response) => {
       [auth.householdId],
     );
 
+    const devices = rows.flatMap((pet) => [
+      buildDevice(pet),
+      buildSceneDevice(pet, 'meal'),
+      buildSceneDevice(pet, 'snack'),
+    ]);
+
     return res.json({
       requestId,
       payload: {
         agentUserId: auth.userId,
-        devices: rows.map(buildDevice),
+        devices,
       },
     });
   }
@@ -165,7 +218,17 @@ smarthomeRouter.post('/', async (req: Request, res: Response) => {
   // MQTT status/LWT marked it 'online' — mirrors what the app shows for the device.
   if (intent === 'action.devices.QUERY') {
     const qPayload = payload as { devices: Array<{ id: string }> };
-    const petIds = (qPayload?.devices ?? []).map((d) => d.id);
+    const allIds = (qPayload?.devices ?? []).map((d) => d.id);
+
+    // Scene devices (Feed Meal / Feed Snack buttons) have no real state —
+    // they're one-shot triggers, not PETFEEDER rows — so split them out
+    // before the pets lookup (their IDs aren't valid pet UUIDs).
+    const sceneIds: string[] = [];
+    const petIds: string[] = [];
+    for (const id of allIds) {
+      if (parseSceneDeviceId(id)) sceneIds.push(id);
+      else petIds.push(id);
+    }
 
     const { rows } = await db.query<{
       id: string;
@@ -199,6 +262,9 @@ smarthomeRouter.post('/', async (req: Request, res: Response) => {
         ),
       };
     }
+    for (const sceneId of sceneIds) {
+      states[sceneId] = { status: 'SUCCESS', online: true };
+    }
 
     return res.json({ requestId, payload: { devices: states } });
   }
@@ -229,6 +295,60 @@ smarthomeRouter.post('/', async (req: Request, res: Response) => {
     for (const cmd of ePayload.commands ?? []) {
       const petIds  = cmd.devices.map((d) => d.id);
       const exec    = cmd.execution[0];
+
+      // ── ActivateScene (Feed Meal / Feed Snack buttons) ──────────────────
+      if (exec.command === 'action.devices.commands.ActivateScene') {
+        for (const id of petIds) {
+          const scene = parseSceneDeviceId(id);
+          if (!scene) {
+            results.push({ ids: [id], status: 'ERROR', errorCode: 'deviceNotFound' });
+            continue;
+          }
+
+          const { rows } = await db.query<PetRow>(
+            `SELECT id, name, type, device_id, meal_weight_g, snack_weight_g
+             FROM   pets
+             WHERE  id = $1
+               AND  household_id = $2
+               AND  deleted_at IS NULL`,
+            [scene.petId, auth.householdId],
+          );
+          const pet = rows[0];
+
+          if (!pet) {
+            results.push({ ids: [id], status: 'ERROR', errorCode: 'deviceNotFound' });
+            continue;
+          }
+          if (!pet.device_id) {
+            results.push({ ids: [id], status: 'ERROR', errorCode: 'deviceOffline' });
+            continue;
+          }
+
+          const weightG = scene.preset === 'snack' ? pet.snack_weight_g : pet.meal_weight_g;
+          if (!weightG || weightG <= 0) {
+            results.push({ ids: [id], status: 'ERROR', errorCode: 'notConfigured' });
+            continue;
+          }
+
+          try {
+            await createDispense({
+              petId:       pet.id,
+              deviceId:    pet.device_id,
+              weightG,
+              triggerType: 'voice',
+            });
+            results.push({ ids: [id], status: 'SUCCESS' });
+          } catch (err: unknown) {
+            const code = (err as { code?: string })?.code;
+            results.push({
+              ids:       [id],
+              status:    'ERROR',
+              errorCode: code === 'FEED_IN_PROGRESS' ? 'alreadyInUse' : 'transientError',
+            });
+          }
+        }
+        continue;
+      }
 
       if (exec.command !== 'action.devices.commands.Dispense') {
         results.push({ ids: petIds, status: 'ERROR', errorCode: 'notSupported' });
