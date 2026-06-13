@@ -170,9 +170,11 @@ async function handleStatusMessage(deviceId: string, msg: MqttStatusPayload) {
   }
 
   // Push a Report State update to Google Home only when something a voice
-  // query would care about actually changed (came back online, or the
-  // hopper level moved) — avoids a Home Graph call on every 30s heartbeat.
-  if (wasOffline || prevHopperPct !== msg.hopper_pct) {
+  // query would care about actually changed (came back online, the hopper
+  // level moved, or a dispense was just confirmed — which changes
+  // amountLastDispensed even if hopper_pct didn't move) — avoids a Home
+  // Graph call on every 30s heartbeat.
+  if (wasOffline || prevHopperPct !== msg.hopper_pct || msg.command_id) {
     reportStateToGoogleHome(deviceId);
   }
 
