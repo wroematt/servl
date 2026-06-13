@@ -11,7 +11,6 @@ export function buildDeviceState(
 ): { online: boolean; dispenseItems: Array<Record<string, unknown>> } {
   const item: Record<string, unknown> = {
     itemName: 'biscuits',
-    isCurrentlyAvailable: online,
   };
 
   if (hopperPct != null) {
