@@ -205,7 +205,7 @@ petsRouter.patch('/:petId', upload.single('photo'), async (req: Request, res: Re
 
   // Cascade weight changes to meal / snack schedules for this pet so that
   // schedules always reflect the pet's current portion sizes.
-  const { meal_weight_g, snack_weight_g } = body.data;
+  const { name, type, meal_weight_g, snack_weight_g } = body.data;
   if (meal_weight_g !== undefined) {
     await db.query(
       `UPDATE schedules SET weight_g = $1 WHERE pet_id = $2 AND feed_type = 'meal'`,
@@ -217,6 +217,13 @@ petsRouter.patch('/:petId', upload.single('photo'), async (req: Request, res: Re
       `UPDATE schedules SET weight_g = $1 WHERE pet_id = $2 AND feed_type = 'snack'`,
       [snack_weight_g, req.params.petId],
     );
+  }
+
+  // name, type, and meal_weight_g all feed into the Smart Home SYNC response
+  // (buildDevice() in feed-service: name.name/nicknames, item_name_synonyms,
+  // default_portion) — requestSync so Google Home picks up the change.
+  if (name !== undefined || type !== undefined || meal_weight_g !== undefined) {
+    requestHomeGraphSync(householdId);
   }
 
   return res.json(result.rows[0]);
