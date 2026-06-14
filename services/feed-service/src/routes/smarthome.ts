@@ -283,6 +283,7 @@ smarthomeRouter.post('/', async (req: Request, res: Response) => {
       states[sceneId] = { status: 'SUCCESS', online: pet?.device_status === 'online' };
     }
 
+    console.log(`[smarthome] QUERY requestId=${requestId} ids=${JSON.stringify(allIds)} states=${JSON.stringify(states)}`);
     return res.json({ requestId, payload: { devices: states } });
   }
 
