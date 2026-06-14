@@ -6,6 +6,7 @@ import { createDispense } from '../lib/dispense';
 import { AppError } from '../lib/errors';
 import { buildDeviceState } from '../lib/devicestate';
 import { reportState, requestSync } from '../lib/homegraph';
+import { SCENE_SUFFIXES } from './smarthome';
 
 export const internalRouter = Router();
 
@@ -104,6 +105,12 @@ internalRouter.post('/button-press', async (req: Request, res: Response) => {
 // and pushes it once per Google account linked to the device's household —
 // the idx_pets_one_per_device index guarantees at most one active pet per
 // device, so the lookup is unambiguous.
+//
+// Also pushes { online } for the pet's two SCENE devices (Feed Meal / Feed
+// Snack — see smarthome.ts buildSceneDevice()). Those declare
+// willReportState: true too, so the Cloud-to-cloud OnlineOffline test expects
+// a proactive state push reflecting their online status within 5 minutes of
+// the underlying device going on/offline — not just the PETFEEDER device.
 
 const reportStateSchema = z.object({
   device_id: z.string().uuid(),
@@ -143,7 +150,9 @@ internalRouter.post('/report-state', async (req: Request, res: Response) => {
     return res.status(200).json({ reported: false, reason: 'NO_PET_ASSIGNED' });
   }
 
-  const state = buildDeviceState(pet.device_status === 'online', pet.hopper_pct, pet.last_dispensed_g ?? undefined);
+  const online = pet.device_status === 'online';
+  const state = buildDeviceState(online, pet.hopper_pct, pet.last_dispensed_g ?? undefined);
+  const sceneState = { online };
 
   const users = await db.query<{ id: string }>(
     `SELECT u.id
@@ -156,6 +165,8 @@ internalRouter.post('/report-state', async (req: Request, res: Response) => {
 
   for (const user of users.rows) {
     await reportState(user.id, pet.pet_id, state);
+    await reportState(user.id, `${pet.pet_id}${SCENE_SUFFIXES.meal}`, sceneState);
+    await reportState(user.id, `${pet.pet_id}${SCENE_SUFFIXES.snack}`, sceneState);
   }
 
   return res.status(200).json({ reported: true, recipients: users.rows.length });

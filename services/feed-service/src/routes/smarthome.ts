@@ -128,7 +128,7 @@ function buildDevice(pet: PetRow) {
 // Device IDs are derived from the pet's UUID with a suffix
 // (`${petId}-meal-scene` / `${petId}-snack-scene`) so EXECUTE/QUERY can route
 // back to the pet without a separate lookup table.
-const SCENE_SUFFIXES = { meal: '-meal-scene', snack: '-snack-scene' } as const;
+export const SCENE_SUFFIXES = { meal: '-meal-scene', snack: '-snack-scene' } as const;
 type ScenePreset = keyof typeof SCENE_SUFFIXES;
 
 function parseSceneDeviceId(id: string): { petId: string; preset: ScenePreset } | null {
