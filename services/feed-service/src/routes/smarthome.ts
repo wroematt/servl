@@ -157,6 +157,12 @@ function buildSceneDevice(pet: PetRow, preset: ScenePreset) {
     // check relies on it (willReportState: false causes that check to time
     // out waiting for a state push that will never come).
     willReportState: true,
+    // Scenes have no room-assignment UI in the Google Home app — per Google's
+    // docs, a scene only becomes part of the household if the providing
+    // service assigns its room via roomHint in SYNC. Without this, the scene
+    // stays unassigned ("unknown" in the app) and Home Graph doesn't treat it
+    // as fully set up, which also breaks the OnlineOffline check.
+    roomHint: 'Kitchen',
     deviceInfo: {
       manufacturer: 'Servl',
       model: 'Smart Pet Feeder',
