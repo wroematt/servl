@@ -152,7 +152,11 @@ function buildSceneDevice(pet: PetRow, preset: ScenePreset) {
       name: `${pet.name} ${label}`,
       nicknames: [`Feed ${pet.name} a ${preset}`, `${pet.name} ${label}`],
     },
-    willReportState: false,
+    // Google's official SCENE example sets this to true even for
+    // non-reversible scenes — the Cloud-to-cloud Test Suite's OnlineOffline
+    // check relies on it (willReportState: false causes that check to time
+    // out waiting for a state push that will never come).
+    willReportState: true,
     deviceInfo: {
       manufacturer: 'Servl',
       model: 'Smart Pet Feeder',
@@ -358,7 +362,7 @@ smarthomeRouter.post('/', async (req: Request, res: Response) => {
               weightG,
               triggerType: 'voice',
             });
-            results.push({ ids: [id], status: 'SUCCESS' });
+            results.push({ ids: [id], status: 'SUCCESS', states: { online: true } });
           } catch (err: unknown) {
             const code = (err as { code?: string })?.code;
             results.push({
