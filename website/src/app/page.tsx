@@ -149,10 +149,19 @@ export default function HomePage() {
           and review feed history for every pet in your household — from anywhere.
         </p>
         <p className="mt-3 max-w-2xl text-sm leading-relaxed text-text-secondary">
-          We design and build connected smart-home devices for pet care. The Servl
-          feeder is our first product — a Wi-Fi connected hardware device with
-          Google Home voice control built in from day one, and more smart-home
-          integrations planned for the future.
+          Feeding time is one of the most important moments in a pet&apos;s day —
+          a chance to connect, and a routine that helps them feel safe. Pets
+          thrive on consistency, and irregular or missed meals can be a source
+          of stress, especially when you&apos;re away from home. Servl is built
+          around that idea: keeping feeding times reliable and consistent, so
+          you can stay close to your pet&apos;s daily routine and care for them
+          with confidence, wherever you are.
+        </p>
+        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-text-secondary">
+          We&apos;re a small team working on our first revision of hardware: the
+          Servl smart pet feeder, with Google Home voice control built in from
+          day one. It&apos;s coming soon — we&apos;re currently running a private
+          beta ahead of launch.
         </p>
         <div className="mt-6 grid grid-cols-3 gap-3 sm:gap-4">
           {gallery.map(({ src, alt }) => (
