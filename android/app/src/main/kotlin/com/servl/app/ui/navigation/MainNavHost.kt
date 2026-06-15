@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -32,6 +33,22 @@ data class BottomNavItem(
     val label: String,
     val icon: ImageVector,
 )
+
+// Shared by the bottom NavigationBar items and any other entry point (e.g. the
+// Home screen's "See all" links) that should land on a top-level tab. Using the
+// same popUpTo/launchSingleTop/restoreState options everywhere keeps the saved
+// back-stack state for each tab consistent regardless of how it was reached —
+// a plain navigate("devices") here previously left the bottom bar showing
+// "Devices" selected but with the Home tab unable to restore afterwards.
+private fun NavHostController.navigateToTab(route: String) {
+    navigate(route) {
+        popUpTo(graph.findStartDestination().id) {
+            saveState = true
+        }
+        launchSingleTop = true
+        restoreState = true
+    }
+}
 
 val bottomNavItems = listOf(
     BottomNavItem(Screen.Home,     "Home",     Icons.Default.Home),
@@ -63,15 +80,7 @@ fun MainNavHost(
                             ?.any { it.route == item.screen.route } == true
                         NavigationBarItem(
                             selected = selected,
-                            onClick = {
-                                navController.navigate(item.screen.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
+                            onClick = { navController.navigateToTab(item.screen.route) },
                             icon = { Icon(item.icon, contentDescription = item.label) },
                             label = { Text(item.label) },
                         )
@@ -89,7 +98,7 @@ fun MainNavHost(
                 HomeScreen(
                     authViewModel = authViewModel,
                     onNavigateToPetDetail = { petId -> navController.navigate(Screen.PetDetail.go(petId)) },
-                    onNavigateToDevices = { navController.navigate(Screen.Devices.route) },
+                    onNavigateToDevices = { navController.navigateToTab(Screen.Devices.route) },
                 )
             }
             composable(Screen.Pets.route) {
