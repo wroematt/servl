@@ -86,6 +86,7 @@ export interface FeedEvent {
   pet_id: string;
   device_id: string;
   triggered_by: string;
+  triggered_by_name: string | null;
   schedule_id: string | null;
   weight_requested_g: number;
   weight_dispensed_g: number | null;

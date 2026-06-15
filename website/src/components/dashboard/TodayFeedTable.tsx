@@ -33,8 +33,7 @@ export function TodayFeedTable({ events, loading, petNames }: TodayFeedTableProp
                 <th className="pb-2 text-left font-medium">Time</th>
                 <th className="pb-2 text-left font-medium">Pet</th>
                 <th className="pb-2 text-left font-medium">Trigger</th>
-                <th className="pb-2 text-right font-medium">Requested</th>
-                <th className="pb-2 text-right font-medium">Dispensed</th>
+                <th className="pb-2 text-right font-medium">Weight</th>
                 <th className="pb-2 text-left font-medium pl-4">Status</th>
               </tr>
             </thead>
@@ -49,11 +48,13 @@ export function TodayFeedTable({ events, loading, petNames }: TodayFeedTableProp
                   </td>
                   <td className="py-2">
                     <TriggerBadge type={ev.trigger_type} />
+                    {ev.trigger_type === 'manual' && ev.triggered_by_name && (
+                      <div className="mt-0.5 text-text-tertiary">{ev.triggered_by_name}</div>
+                    )}
                   </td>
                   <td className="py-2 text-right font-mono text-text-secondary">
                     {formatWeight(ev.weight_requested_g)}
-                  </td>
-                  <td className="py-2 text-right font-mono text-text-secondary">
+                    {' / '}
                     {ev.weight_dispensed_g !== null ? formatWeight(ev.weight_dispensed_g) : '—'}
                   </td>
                   <td className="py-2 pl-4">
