@@ -138,7 +138,7 @@ usersRouter.post('/household/invite', async (req: Request, res: Response) => {
   const token = crypto.randomBytes(32).toString('hex');
   const hash  = hashToken(token);
   await redis.setex(`invite:${hash}`, config.INVITE_TOKEN_TTL, householdId);
-  return res.json({ inviteUrl: `https://${config.DOMAIN}/join?token=${token}` });
+  return res.json({ inviteUrl: `${config.DOMAIN}/join?token=${token}` });
 });
 
 // ── POST /users/household/join ─────────────────

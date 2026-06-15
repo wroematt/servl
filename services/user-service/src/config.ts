@@ -7,7 +7,9 @@ const schema = z.object({
   JWT_SECRET: z.string().min(32),
   JWT_EXPIRES_IN: z.string().default('15m'),
   REFRESH_TOKEN_EXPIRES_IN: z.string().default('30d'),
-  DOMAIN: z.string().default('localhost'),
+  // Full base URL of the website, e.g. "https://app.servl.uk" (no trailing slash).
+  // Used to build absolute links (invite, password reset) sent in emails.
+  DOMAIN: z.string(),
   SMTP_HOST: z.string(),
   SMTP_PORT: z.string().transform(Number),
   SMTP_USER: z.string(),

@@ -176,7 +176,7 @@ authRouter.post('/forgot-password', async (req: Request, res: Response) => {
     const token = crypto.randomBytes(32).toString('hex');
     const hash  = hashToken(token);
     await redis.setex(`reset:${hash}`, config.RESET_TOKEN_TTL, user.id);
-    const resetUrl = `https://${config.DOMAIN}/reset-password?token=${token}`;
+    const resetUrl = `${config.DOMAIN}/reset-password?token=${token}`;
     await sendPasswordReset(user.email, resetUrl);
   }
   return res.json({ message: 'If that email is registered, a reset link has been sent.' });
