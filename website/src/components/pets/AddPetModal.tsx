@@ -3,7 +3,7 @@
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
-import { Pet, useCreatePet } from '@/hooks/usePets';
+import { useCreatePet } from '@/hooks/usePets';
 import { IconPhoto, IconX } from '@tabler/icons-react';
 import { FormEvent, useRef, useState } from 'react';
 
@@ -16,7 +16,7 @@ export function AddPetModal({ open, onClose }: AddPetModalProps) {
   const createPet = useCreatePet();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState('');
-  const [type, setType] = useState<Pet['type']>('cat');
+  const [type, setType] = useState<'cat' | 'dog' | 'other'>('cat');
   const [mealWeight, setMealWeight] = useState('80');
   const [snackWeight, setSnackWeight] = useState('30');
   const [targetDaily, setTargetDaily] = useState('200');
@@ -74,17 +74,10 @@ export function AddPetModal({ open, onClose }: AddPetModalProps) {
         <Select
           label="Type"
           value={type}
-          onChange={(e) => setType(e.target.value as Pet['type'])}
+          onChange={(e) => setType(e.target.value as typeof type)}
         >
           <option value="cat">Cat</option>
           <option value="dog">Dog</option>
-          <option value="rabbit">Rabbit</option>
-          <option value="guinea_pig">Guinea Pig</option>
-          <option value="hamster">Hamster</option>
-          <option value="bird">Bird</option>
-          <option value="tortoise">Tortoise</option>
-          <option value="horse">Horse</option>
-          <option value="ferret">Ferret</option>
           <option value="other">Other</option>
         </Select>
         <div className="grid grid-cols-3 gap-3">

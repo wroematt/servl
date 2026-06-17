@@ -6,7 +6,7 @@
 // ── Domain types ─────────────────────────────
 
 export type Role = 'owner' | 'member';
-export type PetType = 'cat' | 'dog' | 'rabbit' | 'guinea_pig' | 'hamster' | 'bird' | 'tortoise' | 'horse' | 'ferret' | 'other';
+export type PetType = 'cat' | 'dog';
 export type FeedType = 'meal' | 'snack' | 'custom';
 export type TriggerType = 'manual' | 'schedule' | 'voice' | 'api' | 'button';
 export type FeedStatus = 'pending' | 'confirmed' | 'failed' | 'timeout';
