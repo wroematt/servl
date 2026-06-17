@@ -67,7 +67,11 @@ export default function PetDetailPage({ params }: { params: { petId: string } })
     );
   }
 
-  const typeLabel: Record<string, string> = { cat: 'Cat', dog: 'Dog', other: 'Other' };
+  const typeLabel: Record<string, string> = {
+    cat: 'Cat', dog: 'Dog', rabbit: 'Rabbit', guinea_pig: 'Guinea Pig',
+    hamster: 'Hamster', bird: 'Bird', tortoise: 'Tortoise',
+    horse: 'Horse', ferret: 'Ferret', other: 'Other',
+  };
   const totalFeeds = feedData?.total ?? 0;
   const totalPages = Math.ceil(totalFeeds / PAGE_SIZE);
 

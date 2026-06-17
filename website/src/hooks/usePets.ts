@@ -5,7 +5,7 @@ export interface Pet {
   id: string;
   household_id: string;
   name: string;
-  type: 'cat' | 'dog' | 'other';
+  type: 'cat' | 'dog' | 'rabbit' | 'guinea_pig' | 'hamster' | 'bird' | 'tortoise' | 'horse' | 'ferret' | 'other';
   meal_weight_g: number;
   snack_weight_g: number;
   daily_target_g: number;

@@ -15,9 +15,9 @@ interface PetCardProps {
 }
 
 const typeLabel: Record<string, string> = {
-  cat: 'Cat',
-  dog: 'Dog',
-  other: 'Other',
+  cat: 'Cat', dog: 'Dog', rabbit: 'Rabbit', guinea_pig: 'Guinea Pig',
+  hamster: 'Hamster', bird: 'Bird', tortoise: 'Tortoise',
+  horse: 'Horse', ferret: 'Ferret', other: 'Other',
 };
 
 export function PetCard({ pet }: PetCardProps) {

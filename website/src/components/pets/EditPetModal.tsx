@@ -18,7 +18,7 @@ interface EditPetModalProps {
 export function EditPetModal({ pet, open, onClose }: EditPetModalProps) {
   const updatePet = useUpdatePet(pet.id);
   const [name, setName] = useState(pet.name);
-  const [type, setType] = useState<'cat' | 'dog' | 'other'>(pet.type);
+  const [type, setType] = useState(pet.type);
   const [mealWeight, setMealWeight] = useState(String(pet.meal_weight_g));
   const [snackWeight, setSnackWeight] = useState(String(pet.snack_weight_g));
   const [targetDaily, setTargetDaily] = useState(String(pet.daily_target_g));
@@ -139,6 +139,13 @@ export function EditPetModal({ pet, open, onClose }: EditPetModalProps) {
         >
           <option value="cat">Cat</option>
           <option value="dog">Dog</option>
+          <option value="rabbit">Rabbit</option>
+          <option value="guinea_pig">Guinea Pig</option>
+          <option value="hamster">Hamster</option>
+          <option value="bird">Bird</option>
+          <option value="tortoise">Tortoise</option>
+          <option value="horse">Horse</option>
+          <option value="ferret">Ferret</option>
           <option value="other">Other</option>
         </Select>
 
