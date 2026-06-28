@@ -1,49 +1,43 @@
 #pragma once
 #include <Arduino.h>
 
-// Drives the auger stepper motor to dispense the requested weight using
-// CLOSED-LOOP weight feedback from the hopper scale (scale.h): take an
-// initial reading, run the auger at a constant speed until the measured
-// weight has dropped by the requested amount (or a safety timeout trips —
-// DISPENSE_TIMEOUT_MS in config.h), then take a final reading and report what
-// was *actually* removed. Per the TaskList #9 spec this supersedes the
-// open-loop turns-based approach from TaskList #8 — STEPPER_STEPS_PER_GRAM
-// remains in config.h only as the historical starting point that
-// STEPPER_DISPENSE_SPEED_STEPS_PER_SEC was calibrated from.
+// Drives the servo-controlled gravity chute to dispense the requested weight
+// using CLOSED-LOOP weight feedback from the hopper scale (scale.h): take an
+// initial reading, open the chute to SERVO_OPEN_DEG while vibrating ±1° to
+// encourage kibble flow, poll the scale until the measured weight has dropped
+// by the requested amount (or DISPENSE_TIMEOUT_MS trips), then close the chute.
+// The INA169 current sensor is monitored throughout — sustained high current
+// indicates a jam and triggers a clearance cycle (close slightly, vibrate
+// aggressively, reopen).
 //
-// Pumps mqtt_loop() periodically (via stepper_run_until()) so the connection
-// survives what can be a multi-second rotation.
+// Pumps mqtt_loop() periodically so the MQTT connection survives the multi-
+// second dispense window.
+
+// Attach the servo to PIN_SERVO and configure the ADC for the current sensor.
+// Call once from setup(), before the first dispenser_run().
+void dispenser_init();
+
+// Dispense weight_g grams by opening the servo chute. Blocks until the scale
+// confirms the weight has dropped, or DISPENSE_TIMEOUT_MS elapses.
 void dispenser_run(int weight_g);
 
-// Grams *actually measured* as removed during the most recent dispenser_run()
-// — the closed-loop delta, accurate over the few-second timescale of a single
-// dispense (see scale.h for why short-timescale deltas stay accurate even as
-// the long-term baseline drifts). May be less than the requested amount if
-// the dispense hit the safety timeout. main.cpp reports this — not the
-// requested amount — as feed_events.weight_dispensed_g, so the record
-// reflects what actually happened (see CLAUDE.md MQTT confirmation-loop
-// design rationale).
+// Open the chute and keep it open until the scale reads < 5 g (effectively
+// empty) or EMPTY_HOPPER_TIMEOUT_MS elapses. Used for cleaning the hopper.
+void dispenser_empty_hopper();
+
+// Grams *actually measured* as removed during the most recent dispenser_run().
+// May be less than requested if the dispense timed out.
 int dispenser_get_last_dispensed_g();
 
 // False if the most recent dispenser_run() hit DISPENSE_TIMEOUT_MS before
-// reaching the target weight (jam, empty hopper, miscalibrated scale, etc).
-// main.cpp uses this to publish status "error" (with an explanatory
-// error_message) instead of "ok".
+// reaching the target weight.
 bool dispenser_last_run_ok();
 
-// Current hopper level estimate (0-100): the live scale reading — already
-// relative to the calibrated empty-hopper baseline, see scale.h — as a
-// percentage of HOPPER_CAPACITY_G (config.h). Long-term accuracy is bounded
-// by how recently the empty baseline was (re)calibrated
-// (scale_recalibrate_empty()); the per-dispense delta above is the accurate,
-// short-timescale figure, this is the coarser, long-timescale one — exactly
-// the two-tier accuracy split the TaskList #9 spec calls for.
+// Current hopper level estimate (0–100 %). Uses the persisted full-hopper
+// calibration weight (storage.h) if available, otherwise falls back to
+// HOPPER_CAPACITY_G (config.h).
 int dispenser_get_hopper_pct();
 
 // Refresh the hopper level estimate with a fresh reading from the scale.
-// Called on boot, before every status publish (heartbeat or dispense
-// confirmation), and after a recalibration — so the reported %-full always
-// reflects the live measurement rather than a stale cached guess. (Name kept
-// from the pre-load-cell placeholder for main.cpp call-site stability; it no
-// longer "resets" anything; it measures.)
+// Called on boot, before every heartbeat, and after a calibration command.
 void dispenser_reset_hopper();

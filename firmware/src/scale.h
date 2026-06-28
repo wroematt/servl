@@ -72,12 +72,13 @@ float scale_read_grams();
 
 // Re-tare against whatever load is on the platform RIGHT NOW and persist the
 // resulting raw offset as the new "empty hopper" baseline — i.e. "the hopper
-// is empty at this exact moment, remember it." This is how the stored
-// calibrated-empty-weight referenced throughout TaskList #9 gets
-// (re-)established, correcting for the long-term drift the spec explicitly
-// anticipates. It is NOT run automatically (beyond the unavoidable
-// first-ever-boot case in scale_init()) — it's wired to a deliberate BOOT
-// button hold gesture in main.cpp (CALIBRATE_HOLD_MS), because calling this
-// while the hopper actually has food in it would silently wreck the %-full
-// estimate until the next recalibration.
+// is empty at this exact moment, remember it." Wired to the BOOT button short
+// hold (CALIBRATE_HOLD_MS in config.h) and to the remote "calibrate_empty"
+// MQTT command. Only call when the hopper is genuinely empty.
 void scale_recalibrate_empty();
+
+// Read the current weight (grams above the empty baseline) and persist it as
+// the full-hopper 100% reference weight (see storage.h / storage_save_full_weight).
+// Call this when the hopper is filled to capacity. Returns the stored grams
+// value, or 0.0 if the scale is absent/unresponsive.
+float scale_calibrate_full();

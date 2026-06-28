@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/Card';
 import { HopperIndicator } from '@/components/ui/HopperIndicator';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
-import { Device, DeviceEvent, useDeleteDevice, useDeviceEvents, useDevices, useUpdateDevice } from '@/hooks/useDevices';
+import { Device, DeviceEvent, useCalibrateFull, useCalibrateEmpty, useDeleteDevice, useDeviceEvents, useDevices, useEmptyHopper, useUpdateDevice } from '@/hooks/useDevices';
 import { useAuth } from '@/providers/AuthProvider';
 import { formatRelative } from '@/lib/utils';
 import { IconBluetoothConnected, IconCpu } from '@tabler/icons-react';
@@ -105,8 +105,12 @@ function DeviceCard({ device, onSelect }: { device: Device; onSelect: (d: Device
 function DeviceDetailModal({ device, onClose }: { device: Device; onClose: () => void }) {
   const { user } = useAuth();
   const isOwner = user?.role === 'owner';
+  const isOnline = device.status === 'online';
   const updateDevice = useUpdateDevice(device.id);
   const deleteDevice = useDeleteDevice(device.id);
+  const emptyHopper = useEmptyHopper(device.id);
+  const calibrateEmpty = useCalibrateEmpty(device.id);
+  const calibrateFull = useCalibrateFull(device.id);
   const { data: eventsData } = useDeviceEvents(device.id);
 
   const [editing, setEditing] = useState(false);
@@ -197,6 +201,48 @@ function DeviceDetailModal({ device, onClose }: { device: Device; onClose: () =>
             </div>
           )}
         </div>
+
+        {/* Maintenance commands — owner only, device must be online */}
+        {isOwner && isOnline && (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-text-secondary">Maintenance</p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                loading={calibrateEmpty.isPending}
+                onClick={async () => {
+                  if (!confirm('Make sure the hopper is completely EMPTY before calibrating. This sets the zero point for weight measurements.')) return;
+                  await calibrateEmpty.mutateAsync();
+                }}
+              >
+                Calibrate empty
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                loading={calibrateFull.isPending}
+                onClick={async () => {
+                  if (!confirm('Fill the hopper to its maximum level before calibrating. This sets the 100% reference point for the hopper indicator.')) return;
+                  await calibrateFull.mutateAsync();
+                }}
+              >
+                Calibrate full
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                loading={emptyHopper.isPending}
+                onClick={async () => {
+                  if (!confirm('This will open the chute and dispense all remaining kibble. Use this to empty the hopper for cleaning.')) return;
+                  await emptyHopper.mutateAsync();
+                }}
+              >
+                Empty hopper
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Danger zone */}
         {isOwner && (

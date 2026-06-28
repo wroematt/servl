@@ -61,3 +61,21 @@ export function useDeviceEvents(deviceId: string) {
     enabled: !!deviceId,
   });
 }
+
+export function useEmptyHopper(deviceId: string) {
+  return useMutation({
+    mutationFn: () => api.post(`/devices/${deviceId}/empty`, {}),
+  });
+}
+
+export function useCalibrateEmpty(deviceId: string) {
+  return useMutation({
+    mutationFn: () => api.post(`/devices/${deviceId}/calibrate-empty`, {}),
+  });
+}
+
+export function useCalibrateFull(deviceId: string) {
+  return useMutation({
+    mutationFn: () => api.post(`/devices/${deviceId}/calibrate-full`, {}),
+  });
+}

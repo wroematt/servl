@@ -19,8 +19,11 @@ struct OtaCommand {
 
 // Set by the message callback; cleared by main.cpp after the command is handled.
 extern volatile bool  g_commandPending;
-extern volatile bool  g_factoryResetPending;   // set when broker sends action=factory_reset
-extern volatile bool  g_otaPending;            // set when broker sends action=ota
+extern volatile bool  g_factoryResetPending;    // set when broker sends action=factory_reset
+extern volatile bool  g_otaPending;             // set when broker sends action=ota
+extern volatile bool  g_emptyHopperPending;     // set when broker sends action=empty_hopper
+extern volatile bool  g_calibrateEmptyPending;  // set when broker sends action=calibrate_empty
+extern volatile bool  g_calibrateFullPending;   // set when broker sends action=calibrate_full
 extern PendingCommand g_pendingCommand;
 extern OtaCommand     g_otaCommand;
 

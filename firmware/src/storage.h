@@ -48,3 +48,20 @@ long storage_load_scale_offset();
 // offset (factory reset / re-provisioning a relocated unit should not inherit
 // a stale baseline from its previous home).
 void storage_clear();
+
+// ─── Full-hopper weight calibration ──────────────────────────────────────────
+// When the user issues a "Calibrate full weight" command with the hopper
+// completely filled, the current scale reading (grams above the empty baseline)
+// is stored here and used as the 100% reference for hopper_pct. Before this is
+// ever saved, HOPPER_CAPACITY_G (config.h) is used as the fallback.
+
+// Returns true if a full-hopper reference weight has been persisted.
+bool storage_has_full_weight();
+
+// Persist the full-hopper reference weight (grams above the empty baseline).
+void storage_save_full_weight(float grams);
+
+// Read the persisted full-hopper reference weight. Returns 0.0 if none has been
+// saved — callers should check storage_has_full_weight() first, or compare the
+// returned value against 0 before dividing.
+float storage_load_full_weight();

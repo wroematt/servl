@@ -101,3 +101,18 @@ void scale_recalibrate_empty() {
     storage_save_scale_offset(offset);
     log_i("[scale] New empty-hopper baseline stored (raw offset %ld)", offset);
 }
+
+float scale_calibrate_full() {
+    if (!s_scalePresent) {
+        log_w("[scale] Cannot calibrate full — no scale present");
+        return 0.0f;
+    }
+    float grams = scale_read_grams();
+    if (isnan(grams) || grams <= 0.0f) {
+        log_e("[scale] Full-hopper calibration failed — scale read %.1f g (is the hopper full?)", grams);
+        return 0.0f;
+    }
+    storage_save_full_weight(grams);
+    log_i("[scale] Full-hopper calibration: %.1f g stored as 100%%", grams);
+    return grams;
+}

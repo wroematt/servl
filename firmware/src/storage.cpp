@@ -84,3 +84,28 @@ void storage_clear() {
     prefs.end();
     log_i("[storage] Credentials and scale calibration erased");
 }
+
+// ─── Full-hopper weight calibration ──────────────────────────────────────────
+bool storage_has_full_weight() {
+    Preferences prefs;
+    prefs.begin(NVS_NS, /*readOnly=*/true);
+    bool has = prefs.isKey("scale_full");
+    prefs.end();
+    return has;
+}
+
+void storage_save_full_weight(float grams) {
+    Preferences prefs;
+    prefs.begin(NVS_NS, /*readOnly=*/false);
+    prefs.putFloat("scale_full", grams);
+    prefs.end();
+    log_i("[storage] Full-hopper reference weight saved: %.1f g", grams);
+}
+
+float storage_load_full_weight() {
+    Preferences prefs;
+    prefs.begin(NVS_NS, /*readOnly=*/true);
+    float grams = prefs.getFloat("scale_full", 0.0f);
+    prefs.end();
+    return grams;
+}

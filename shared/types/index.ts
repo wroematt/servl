@@ -112,9 +112,11 @@ export interface DeviceEvent {
 // ── MQTT message payloads ─────────────────────
 
 export interface MqttCommandPayload {
-  command_id: string;       // feed_event.id — used to confirm back, or 'factory_reset'
-  action: 'dispense' | 'factory_reset';
-  weight_g: number;
+  command_id: string;
+  action: 'dispense' | 'factory_reset' | 'ota' | 'empty_hopper' | 'calibrate_empty' | 'calibrate_full';
+  weight_g?: number;    // dispense only
+  url?: string;         // ota only
+  version?: string;     // ota only
 }
 
 export interface MqttStatusPayload {

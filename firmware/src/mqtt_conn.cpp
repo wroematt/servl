@@ -10,11 +10,14 @@
 #include <ArduinoJson.h>
 
 // ─── Global command state (declared in mqtt_conn.h) ──────────────────────────
-volatile bool  g_commandPending      = false;
-volatile bool  g_factoryResetPending = false;
-volatile bool  g_otaPending          = false;
-PendingCommand g_pendingCommand      = {};
-OtaCommand     g_otaCommand          = {};
+volatile bool  g_commandPending       = false;
+volatile bool  g_factoryResetPending  = false;
+volatile bool  g_otaPending           = false;
+volatile bool  g_emptyHopperPending   = false;
+volatile bool  g_calibrateEmptyPending = false;
+volatile bool  g_calibrateFullPending  = false;
+PendingCommand g_pendingCommand        = {};
+OtaCommand     g_otaCommand            = {};
 
 // ─── Module-level state ───────────────────────────────────────────────────────
 static WiFiClient    s_wifiClient;
@@ -51,6 +54,23 @@ static void onMessage(const char* topic, uint8_t* payload, unsigned int length) 
     if (strcmp(action, "factory_reset") == 0) {
         log_w("[mqtt] Factory reset command received from broker");
         g_factoryResetPending = true;
+        return;
+    }
+
+    // Maintenance commands — executed in the OPERATIONAL state by main.cpp.
+    if (strcmp(action, "empty_hopper") == 0) {
+        log_i("[mqtt] Empty-hopper command received");
+        g_emptyHopperPending = true;
+        return;
+    }
+    if (strcmp(action, "calibrate_empty") == 0) {
+        log_i("[mqtt] Calibrate-empty command received");
+        g_calibrateEmptyPending = true;
+        return;
+    }
+    if (strcmp(action, "calibrate_full") == 0) {
+        log_i("[mqtt] Calibrate-full command received");
+        g_calibrateFullPending = true;
         return;
     }
 

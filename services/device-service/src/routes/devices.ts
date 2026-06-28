@@ -342,10 +342,73 @@ devicesRouter.post('/:deviceId/ota', async (req: Request, res: Response) => {
     action: 'ota',
     url: downloadUrl,
     version,
-    weight_g: 0,   // unused for OTA, included to satisfy the shared type
-  } as any);
+  });
 
   console.log(`[ota] Sent OTA command to device ${deviceUuid}: v${version} from ${downloadUrl}`);
 
   return res.json({ message: 'OTA command sent', version, download_url: downloadUrl });
+});
+
+// ── Shared helper — look up a device, verify household ownership, check online ─
+
+async function getOnlineDevice(deviceId: string, householdId: string, role: string, res: Response) {
+  if (role !== 'owner') {
+    res.status(403).json({ code: 'FORBIDDEN', message: 'Owner role required' });
+    return null;
+  }
+  const device = await db.query(
+    'SELECT id, mqtt_client_id, status FROM devices WHERE id = $1 AND household_id = $2',
+    [deviceId, householdId],
+  );
+  if (!device.rows[0]) {
+    res.status(404).json({ code: 'NOT_FOUND', message: 'Device not found' });
+    return null;
+  }
+  if (device.rows[0].status !== 'online') {
+    res.status(409).json({ code: 'CONFLICT', message: 'Device is offline' });
+    return null;
+  }
+  const mqttClientId: string = device.rows[0].mqtt_client_id;
+  const deviceUuid = mqttClientId.startsWith('device_') ? mqttClientId.slice(7) : mqttClientId;
+  return deviceUuid;
+}
+
+// ── POST /devices/:deviceId/empty ──────────────────────────────────────────────
+// Sends an empty_hopper command — device opens the chute until the hopper is
+// empty. Use before cleaning or refilling the hopper.
+
+devicesRouter.post('/:deviceId/empty', async (req: Request, res: Response) => {
+  const { householdId, role } = getHeaders(req);
+  const deviceUuid = await getOnlineDevice(req.params.deviceId, householdId, role, res);
+  if (!deviceUuid) return;
+
+  publishCommand(deviceUuid, { command_id: crypto.randomUUID(), action: 'empty_hopper' });
+  return res.json({ message: 'Empty hopper command sent' });
+});
+
+// ── POST /devices/:deviceId/calibrate-empty ────────────────────────────────────
+// Calibrates the empty-hopper scale baseline. Hopper must be physically empty
+// when this is called.
+
+devicesRouter.post('/:deviceId/calibrate-empty', async (req: Request, res: Response) => {
+  const { householdId, role } = getHeaders(req);
+  const deviceUuid = await getOnlineDevice(req.params.deviceId, householdId, role, res);
+  if (!deviceUuid) return;
+
+  publishCommand(deviceUuid, { command_id: crypto.randomUUID(), action: 'calibrate_empty' });
+  return res.json({ message: 'Calibrate empty command sent' });
+});
+
+// ── POST /devices/:deviceId/calibrate-full ─────────────────────────────────────
+// Calibrates the full-hopper reference weight. Hopper must be filled to its
+// maximum capacity when this is called. This value becomes the 100% reference
+// for hopper percentage displayed in the app.
+
+devicesRouter.post('/:deviceId/calibrate-full', async (req: Request, res: Response) => {
+  const { householdId, role } = getHeaders(req);
+  const deviceUuid = await getOnlineDevice(req.params.deviceId, householdId, role, res);
+  if (!deviceUuid) return;
+
+  publishCommand(deviceUuid, { command_id: crypto.randomUUID(), action: 'calibrate_full' });
+  return res.json({ message: 'Calibrate full command sent' });
 });

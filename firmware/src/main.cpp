@@ -8,7 +8,6 @@
 #include "wifi_conn.h"
 #include "mqtt_conn.h"
 #include "dispenser.h"
-#include "stepper.h"
 #include "scale.h"
 #include "buttons.h"
 #include "led_status.h"
@@ -20,6 +19,7 @@ enum class AppState {
     MQTT_CONNECTING,    // WiFi up — connecting to MQTT broker
     OPERATIONAL,        // MQTT connected — listening for commands
     DISPENSING,         // Executing a dispense command
+    EMPTYING,           // Running empty-hopper maintenance command
     UPDATING,           // Downloading + flashing OTA firmware update
 };
 
@@ -35,6 +35,7 @@ static void handle_wifi_connecting();
 static void handle_mqtt_connecting();
 static void handle_operational();
 static void handle_dispensing();
+static void handle_emptying();
 static void handle_updating();
 static void check_factory_reset();
 
@@ -47,7 +48,7 @@ void setup() {
     pinMode(PIN_BUTTON, INPUT_PULLUP);   // BOOT button is active LOW
     digitalWrite(PIN_LED, LOW);
 
-    stepper_init();
+    dispenser_init();
     scale_init();
     buttons_init();
     dispenser_reset_hopper();
@@ -78,6 +79,7 @@ void loop() {
         case AppState::MQTT_CONNECTING:  handle_mqtt_connecting();  break;
         case AppState::OPERATIONAL:      handle_operational();      break;
         case AppState::DISPENSING:       handle_dispensing();       break;
+        case AppState::EMPTYING:         handle_emptying();         break;
         case AppState::UPDATING:         handle_updating();         break;
     }
 }
@@ -281,11 +283,48 @@ static void handle_operational() {
         return;
     }
 
+    // Calibrate-empty: re-tare the scale against the current load (hopper must
+    // be empty). Same effect as the BOOT button short-hold gesture.
+    if (g_calibrateEmptyPending) {
+        g_calibrateEmptyPending = false;
+        log_i("[main] Remote calibrate-empty command");
+        for (int i = 0; i < 2; i++) {
+            digitalWrite(PIN_LED, HIGH); delay(150);
+            digitalWrite(PIN_LED, LOW);  delay(150);
+        }
+        scale_recalibrate_empty();
+        dispenser_reset_hopper();
+        mqtt_publish_status(nullptr, -1, dispenser_get_hopper_pct(), "ok");
+    }
+
+    // Calibrate-full: read current scale weight and store it as the 100%
+    // reference (hopper must be completely filled before issuing this).
+    if (g_calibrateFullPending) {
+        g_calibrateFullPending = false;
+        log_i("[main] Remote calibrate-full command");
+        for (int i = 0; i < 3; i++) {
+            digitalWrite(PIN_LED, HIGH); delay(150);
+            digitalWrite(PIN_LED, LOW);  delay(150);
+        }
+        scale_calibrate_full();
+        dispenser_reset_hopper();
+        mqtt_publish_status(nullptr, -1, dispenser_get_hopper_pct(), "ok");
+    }
+
+    // Empty-hopper: open the chute until the hopper reads near-zero — handled
+    // in EMPTYING state because it can take up to EMPTY_HOPPER_TIMEOUT_MS.
+    if (g_emptyHopperPending) {
+        log_i("[main] Empty-hopper command received — moving to EMPTYING");
+        s_state = AppState::EMPTYING;
+        led_status_set(LedState::DISPENSING);
+        return;
+    }
+
     // Check for a pending dispense command (set by the MQTT message callback).
     if (g_commandPending) {
         log_i("[main] Dispense command received — moving to DISPENSING");
         s_state = AppState::DISPENSING;
-        led_status_set(LedState::DISPENSING);  // fast blink — auger motor running
+        led_status_set(LedState::DISPENSING);
     }
 
     // Check the physical Meal/Snack buttons for a qualifying double-click (see
@@ -306,8 +345,8 @@ static void handle_operational() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // State: DISPENSING
-// Drive the auger to dispense the requested weight, then publish confirmation
-// and return to OPERATIONAL.
+// Open the servo chute to dispense the requested weight, then publish
+// confirmation and return to OPERATIONAL.
 // ─────────────────────────────────────────────────────────────────────────────
 static void handle_dispensing() {
     // Capture the command before clearing the flag.
@@ -316,9 +355,9 @@ static void handle_dispensing() {
 
     log_i("[main] DISPENSING %dg  command_id: %s", cmd.weight_g, cmd.command_id);
 
-    // dispenser_run() drives the stepper motor under closed-loop weight
-    // feedback from the hopper scale (see scale.h / dispenser.cpp) and pumps
-    // mqtt_loop() periodically to keep the connection alive during the rotation.
+    // dispenser_run() opens the chute servo under closed-loop weight feedback
+    // from the hopper scale (see scale.h / dispenser.cpp) and pumps mqtt_loop()
+    // periodically to keep the connection alive during the dispense.
     dispenser_run(cmd.weight_g);
 
     int  hopper   = dispenser_get_hopper_pct();
@@ -334,7 +373,7 @@ static void handle_dispensing() {
     } else {
         mqtt_publish_status(cmd.command_id, measured, hopper, "error",
                             "Dispense timed out before reaching the target weight "
-                            "— check the hopper, auger, and scale calibration");
+                            "— check the hopper, chute servo, and scale calibration");
     }
 
     // If hopper just went below 20%, send an explicit low_hopper notification.
@@ -344,6 +383,23 @@ static void handle_dispensing() {
     }
 
     log_i("[main] Dispense done — returning to OPERATIONAL");
+    s_state = AppState::OPERATIONAL;
+    led_status_set(LedState::OPERATIONAL);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// State: EMPTYING
+// Open the servo chute and keep it open until the hopper scale reads near zero
+// (< 5 g) or EMPTY_HOPPER_TIMEOUT_MS elapses. Used to fully empty the hopper
+// before cleaning or refilling. Returns to OPERATIONAL when done.
+// ─────────────────────────────────────────────────────────────────────────────
+static void handle_emptying() {
+    g_emptyHopperPending = false;
+    log_i("[main] EMPTYING: opening chute until hopper is empty");
+    dispenser_empty_hopper();
+    dispenser_reset_hopper();
+    mqtt_publish_status(nullptr, -1, dispenser_get_hopper_pct(), "ok");
+    log_i("[main] EMPTYING done — returning to OPERATIONAL");
     s_state = AppState::OPERATIONAL;
     led_status_set(LedState::OPERATIONAL);
 }
