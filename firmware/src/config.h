@@ -40,7 +40,27 @@ constexpr uint32_t SERVO_VIBRATE_INTERVAL_MS = 5;  // toggle every 5 ms → ~100
 constexpr uint32_t SERVO_OPEN_SETTLE_MS      = 400; // wait after opening before dispense loop
 constexpr uint32_t SERVO_CLOSE_SETTLE_MS     = 400; // wait after closing for kibble to settle
 
-// ─── INA169 jam detection ─────────────────────────────────────────────────────
+// ─── Servo position feedback ──────────────────────────────────────────────────
+// The servo's internal potentiometer outputs an analogue voltage proportional to
+// shaft angle: 0.28 V at 0° → 2.04 V at 180° (full travel). The chute only
+// uses 0°–45°, which maps to ≈0.28 V (closed) → ≈0.72 V (open).
+//
+// GPIO32 (freed from the old stepper-enable pin) is used by default — adjust
+// PIN_SERVO_FEEDBACK to whichever ADC1 GPIO you've actually wired it to.
+constexpr uint8_t PIN_SERVO_FEEDBACK = 32;
+
+// Voltage at the two mechanical extremes of the servo (V). Used to linearly
+// interpolate expected ADC counts at any commanded angle (see dispenser.cpp).
+constexpr float SERVO_FEEDBACK_V_AT_0DEG   = 0.28f;
+constexpr float SERVO_FEEDBACK_V_AT_180DEG = 2.04f;
+
+// If the servo's measured position falls more than this many degrees below the
+// commanded angle, it is assumed to be mechanically blocked (jam). A wider
+// tolerance avoids false trips from servo slop and ADC noise; tighten once
+// the mechanical tolerances of the specific servo are known.
+constexpr int JAM_POSITION_TOLERANCE_DEG = 8;
+
+// ─── INA169 current-based jam detection ───────────────────────────────────────
 // The INA169 outputs a voltage proportional to servo current; the ESP32 reads
 // it via the 12-bit ADC (0–4095 counts over 0–3.3 V with ADC_11db attenuation).
 //
@@ -52,7 +72,7 @@ constexpr uint32_t SERVO_CLOSE_SETTLE_MS     = 400; // wait after closing for ki
 // Start high (400) and lower until genuine jams are caught without false trips
 // on normal servo load.
 constexpr int JAM_CURRENT_THRESHOLD   = 400;
-constexpr uint32_t CURRENT_POLL_INTERVAL_MS = 50; // check current every 50 ms
+constexpr uint32_t CURRENT_POLL_INTERVAL_MS = 50; // check current + position every 50 ms
 
 // Jam clearance: close the chute slightly and vibrate aggressively to free
 // the blockage before reopening.

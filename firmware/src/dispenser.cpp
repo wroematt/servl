@@ -33,6 +33,47 @@ static int read_current_raw() {
     return analogRead(PIN_CURRENT_SENSE);
 }
 
+// Read the servo position feedback potentiometer (raw 12-bit ADC, 0–4095).
+static int read_position_raw() {
+    return analogRead(PIN_SERVO_FEEDBACK);
+}
+
+// Convert a servo angle (degrees) to the expected raw ADC count from the
+// position feedback pot, using linear interpolation over the full 0°–180° range.
+//   V(θ) = V_0 + θ/180 × (V_180 − V_0)
+//   ADC  = V / 3.3 × 4095
+static int expected_position_adc(int angleDeg) {
+    float v = SERVO_FEEDBACK_V_AT_0DEG +
+              (float)angleDeg / 180.0f *
+              (SERVO_FEEDBACK_V_AT_180DEG - SERVO_FEEDBACK_V_AT_0DEG);
+    return (int)(v / 3.3f * 4095.0f + 0.5f);
+}
+
+// Jam detection: true if either the INA169 or position feedback indicates the
+// servo is being held back by a physical obstruction.
+//
+// A jam is flagged when:
+//   current  — raw ADC > JAM_CURRENT_THRESHOLD (motor stalling)
+//   position — measured ADC < expected ADC for (commandedDeg − tolerance)
+//              i.e. servo failed to reach close to its commanded angle
+static bool is_jammed(int commandedDeg) {
+    int currentRaw = read_current_raw();
+    int posRaw     = read_position_raw();
+    int posThresh  = expected_position_adc(commandedDeg - JAM_POSITION_TOLERANCE_DEG);
+
+    bool jamCurrent  = (currentRaw > JAM_CURRENT_THRESHOLD);
+    bool jamPosition = (posRaw < posThresh);
+
+    if (jamCurrent) {
+        log_w("[dispenser] Jam — high current: %d (threshold %d)", currentRaw, JAM_CURRENT_THRESHOLD);
+    }
+    if (jamPosition) {
+        log_w("[dispenser] Jam — position %d below %d° threshold (ADC %d)",
+              posRaw, commandedDeg - JAM_POSITION_TOLERANCE_DEG, posThresh);
+    }
+    return jamCurrent || jamPosition;
+}
+
 // Attempt to clear a kibble jam: close the chute slightly, vibrate the servo
 // aggressively to dislodge the blockage, then reopen.
 static void clear_jam() {
@@ -92,10 +133,12 @@ static bool run_chute(float startW, float weightTarget, uint32_t timeout_ms) {
             mqtt_loop();
         }
 
-        // Current-sensor jam detection.
+        // Jam detection: check both INA169 current and servo position feedback.
+        // A jam is declared if the servo is drawing excessive current OR has
+        // failed to reach within JAM_POSITION_TOLERANCE_DEG of the open angle.
         if (now - lastCurrentMs >= CURRENT_POLL_INTERVAL_MS) {
             lastCurrentMs = now;
-            if (read_current_raw() > JAM_CURRENT_THRESHOLD) {
+            if (is_jammed(SERVO_OPEN_DEG)) {
                 clear_jam();
                 lastCurrentMs = millis();
             }
@@ -135,9 +178,11 @@ void dispenser_init() {
     s_servo.attach(PIN_SERVO);
     s_servo.write(SERVO_CLOSED_DEG);
 
-    // Configure ADC for the INA169 current sensor (0–3.3 V range).
-    analogSetPinAttenuation(PIN_CURRENT_SENSE, ADC_11db);
+    // Configure ADC for the INA169 current sensor and servo position feedback
+    // (both need 0–3.3 V range with 12-bit resolution).
     analogReadResolution(12);
+    analogSetPinAttenuation(PIN_CURRENT_SENSE,  ADC_11db);
+    analogSetPinAttenuation(PIN_SERVO_FEEDBACK, ADC_11db);
 }
 
 void dispenser_run(int weight_g) {
