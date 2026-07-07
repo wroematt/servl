@@ -28,6 +28,9 @@ static Credentials   s_creds          = {};
 static uint32_t      s_heartbeatAt    = 0;
 static uint32_t      s_btnPressAt     = 0;
 static bool          s_calibrateFired = false;   // guards the recalibration hold-tier firing more than once per press
+static uint32_t      s_comboPressAt   = 0;       // millis() when Meal+Snack combo hold started
+static bool          s_comboCalibFired = false;  // guards calibrate tier of the combo hold
+static uint32_t      s_scaleDebugAt   = 0;
 
 // ─── Forward declarations ─────────────────────────────────────────────────────
 static void handle_provisioning_ble();
@@ -73,6 +76,20 @@ void loop() {
     check_factory_reset();
     led_status_update();
 
+    // Scale debug: print a weight reading every SCALE_DEBUG_INTERVAL_MS.
+    // Runs in all states so you can verify the load cells before provisioning.
+    // Set SCALE_DEBUG_INTERVAL_MS = 0 in config.h to disable.
+    if (SCALE_DEBUG_INTERVAL_MS > 0 && millis() >= s_scaleDebugAt) {
+        float w = scale_read_grams();
+        if (isnan(w)) {
+            log_w("[scale] No reading — HX711 not ready or not connected (DOUT=GPIO%d SCK=GPIO%d)",
+                  PIN_SCALE_DOUT, PIN_SCALE_SCK);
+        } else {
+            log_i("[scale] Weight: %.1f g", w);
+        }
+        s_scaleDebugAt = millis() + SCALE_DEBUG_INTERVAL_MS;
+    }
+
     switch (s_state) {
         case AppState::PROVISIONING_BLE: handle_provisioning_ble(); break;
         case AppState::WIFI_CONNECTING:  handle_wifi_connecting();  break;
@@ -85,51 +102,85 @@ void loop() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// BOOT button hold gestures — two tiers (see CALIBRATE_HOLD_MS / RESET_HOLD_MS
-// in config.h):
-//   short hold  → recalibrate the empty-hopper scale baseline (hopper MUST be
-//                 empty — see scale_recalibrate_empty())
-//   long hold   → factory reset: erase credentials, reboot into provisioning
+// Hold-gesture handler — two tiers, two input sources (see config.h):
+//   Tier 1 (CALIBRATE_HOLD_MS): recalibrate the empty-hopper scale baseline
+//   Tier 2 (RESET_HOLD_MS):     factory reset — erase credentials, reboot
+//
+// Sources (either triggers the same actions):
+//   • BOOT button held (original)
+//   • Meal + Snack buttons held simultaneously (so only two buttons are needed)
 // ─────────────────────────────────────────────────────────────────────────────
+static void do_calibrate_hold() {
+    log_w("[main] Hold gesture: empty-hopper recalibration triggered");
+    for (int i = 0; i < 2; i++) {
+        digitalWrite(PIN_LED, HIGH); delay(150);
+        digitalWrite(PIN_LED, LOW);  delay(150);
+    }
+    scale_recalibrate_empty();
+    dispenser_reset_hopper();
+}
+
+static void do_reset_hold() {
+    log_w("[main] Hold gesture: factory reset — erasing credentials and rebooting");
+    for (int i = 0; i < 5; i++) {
+        digitalWrite(PIN_LED, HIGH); delay(100);
+        digitalWrite(PIN_LED, LOW);  delay(100);
+    }
+    storage_clear();
+    esp_restart();
+}
+
 static void check_factory_reset() {
+    // ── Source 1: BOOT button ─────────────────────────────────────────────
     if (digitalRead(PIN_BUTTON) == LOW) {
         if (s_btnPressAt == 0) {
             s_btnPressAt     = millis();
             s_calibrateFired = false;
         }
         uint32_t held = millis() - s_btnPressAt;
-
-        // Tier 1: empty-hopper recalibration. Fires once per press — guarded
-        // so it doesn't repeat on every loop() iteration while held past this
-        // threshold, and so it stays a one-shot even if the hold continues on
-        // into factory-reset territory.
         if (!s_calibrateFired && held >= CALIBRATE_HOLD_MS && held < RESET_HOLD_MS) {
             s_calibrateFired = true;
-            log_w("[main] Empty-hopper recalibration triggered (BOOT held %lu ms)", (unsigned long)held);
-            // Two short flashes = "calibrating" — visually distinct from the
-            // five-flash factory-reset confirmation below.
-            for (int i = 0; i < 2; i++) {
-                digitalWrite(PIN_LED, HIGH); delay(150);
-                digitalWrite(PIN_LED, LOW);  delay(150);
-            }
-            scale_recalibrate_empty();
-            dispenser_reset_hopper();   // refresh the %-full estimate against the new baseline
+            do_calibrate_hold();
         }
-
-        // Tier 2: factory reset (existing behaviour, unchanged threshold).
         if (held >= RESET_HOLD_MS) {
-            log_w("[main] Factory reset triggered — erasing credentials and rebooting");
-            // Flash LED rapidly 5× to give visible feedback
-            for (int i = 0; i < 5; i++) {
-                digitalWrite(PIN_LED, HIGH); delay(100);
-                digitalWrite(PIN_LED, LOW);  delay(100);
-            }
-            storage_clear();
-            esp_restart();
+            do_reset_hold();
         }
     } else {
         s_btnPressAt     = 0;
         s_calibrateFired = false;
+    }
+
+    // ── Source 2: Meal + Snack held together ──────────────────────────────
+    // Acts identically to the BOOT button two-tier gesture so only two buttons
+    // are needed on the enclosure. The combo is detected with raw digitalRead()
+    // (same as the BOOT button above) — the buttons.cpp debounce/double-click
+    // machinery operates independently for individual press events.
+    bool comboHeld = (digitalRead(PIN_BUTTON_MEAL)  == LOW &&
+                      digitalRead(PIN_BUTTON_SNACK) == LOW);
+    if (comboHeld) {
+        if (s_comboPressAt == 0) {
+            s_comboPressAt    = millis();
+            s_comboCalibFired = false;
+            // Clear any pending click state so releasing after the hold can't
+            // accidentally pair with a future press into a double-click.
+            buttons_cancel();
+        }
+        uint32_t held = millis() - s_comboPressAt;
+        if (!s_comboCalibFired && held >= CALIBRATE_HOLD_MS && held < RESET_HOLD_MS) {
+            s_comboCalibFired = true;
+            do_calibrate_hold();
+        }
+        if (held >= RESET_HOLD_MS) {
+            do_reset_hold();
+        }
+    } else {
+        if (s_comboPressAt != 0) {
+            // Combo just released — clear any click state that accumulated
+            // while both were held to prevent stale double-click pairing.
+            buttons_cancel();
+        }
+        s_comboPressAt    = 0;
+        s_comboCalibFired = false;
     }
 }
 
@@ -335,11 +386,17 @@ static void handle_operational() {
     // This is fire-and-forget — the resulting feed (if any) arrives back as an
     // ordinary MQTT dispense command, exactly like an app- or schedule-triggered
     // one, and is handled by the existing g_commandPending path above.
-    ButtonId pressed;
-    if (buttons_poll(&pressed)) {
-        const char* feedType = (pressed == ButtonId::MEAL) ? "meal" : "snack";
-        log_i("[main] %s button double-clicked — requesting feed", feedType);
-        mqtt_publish_button_press(feedType);
+    // Skip individual double-click detection while both buttons are physically
+    // held (the combo-hold gesture is handled in check_factory_reset()).
+    bool comboHeld = (digitalRead(PIN_BUTTON_MEAL)  == LOW &&
+                      digitalRead(PIN_BUTTON_SNACK) == LOW);
+    if (!comboHeld) {
+        ButtonId pressed;
+        if (buttons_poll(&pressed)) {
+            const char* feedType = (pressed == ButtonId::MEAL) ? "meal" : "snack";
+            log_i("[main] %s button double-clicked — requesting feed", feedType);
+            mqtt_publish_button_press(feedType);
+        }
     }
 }
 

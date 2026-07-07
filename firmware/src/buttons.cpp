@@ -64,6 +64,11 @@ static bool poll_one(ButtonState& btn, uint32_t now) {
     return false;
 }
 
+void buttons_cancel() {
+    s_meal.clickCount  = 0;
+    s_snack.clickCount = 0;
+}
+
 void buttons_init() {
     // PIN_BUTTON_MEAL is an input-only GPIO (34/35/36/39) — these pins have no
     // internal pull-up hardware, so INPUT_PULLUP is silently ignored on ESP32.

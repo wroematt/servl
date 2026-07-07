@@ -28,6 +28,10 @@ static void update_hopper_pct(float grams) {
     s_hopperPct = constrain(s_hopperPct, 0, 100);
 }
 
+static void vibration_set(uint8_t duty) {
+    ledcWrite(VIBRATION_LEDC_CHANNEL, duty);
+}
+
 // Read the INA169 current sensor (raw 12-bit ADC, 0–4095).
 static int read_current_raw() {
     return analogRead(PIN_CURRENT_SENSE);
@@ -51,11 +55,6 @@ static int expected_position_adc(int angleDeg) {
 
 // Jam detection: true if either the INA169 or position feedback indicates the
 // servo is being held back by a physical obstruction.
-//
-// A jam is flagged when:
-//   current  — raw ADC > JAM_CURRENT_THRESHOLD (motor stalling)
-//   position — measured ADC < expected ADC for (commandedDeg − tolerance)
-//              i.e. servo failed to reach close to its commanded angle
 static bool is_jammed(int commandedDeg) {
     int currentRaw = read_current_raw();
     int posRaw     = read_position_raw();
@@ -74,26 +73,24 @@ static bool is_jammed(int commandedDeg) {
     return jamCurrent || jamPosition;
 }
 
-// Attempt to clear a kibble jam: close the chute slightly, vibrate the servo
-// aggressively to dislodge the blockage, then reopen.
+// Attempt to clear a kibble jam: close the chute slightly, run the vibration
+// motor at full power to dislodge the blockage, then reopen.
 static void clear_jam() {
     log_w("[dispenser] Jam detected — running clearance cycle");
     int partial = SERVO_OPEN_DEG - JAM_CLEAR_CLOSE_DEG;
     if (partial < 0) partial = 0;
+
     s_servo.write(partial);
-    delay(200);
-    for (int i = 0; i < JAM_CLEAR_CYCLES; i++) {
-        s_servo.write(partial + SERVO_VIBRATE_AMP * 3);
-        delay(JAM_CLEAR_HALF_PERIOD_MS);
-        s_servo.write(partial - SERVO_VIBRATE_AMP * 3);
-        delay(JAM_CLEAR_HALF_PERIOD_MS);
-    }
+    vibration_set(VIBRATION_DUTY_JAM_CLEAR);
+    delay((uint32_t)JAM_CLEAR_CYCLES * JAM_CLEAR_HALF_PERIOD_MS * 2);
+    vibration_set(VIBRATION_DUTY_DISPENSE);
+
     s_servo.write(SERVO_OPEN_DEG);
     delay(200);
 }
 
-// Core chute loop: open the servo, vibrate continuously, poll the scale until
-// the stop condition is met, then close the servo.
+// Core chute loop: open the servo, run the vibration motor, poll the scale
+// until the stop condition is met, then stop the motor and close the servo.
 //
 //   startW        — scale reading taken BEFORE opening (grams above empty baseline).
 //                   Pass NAN if the scale is absent; in that case the loop runs
@@ -108,24 +105,16 @@ static bool run_chute(float startW, float weightTarget, uint32_t timeout_ms) {
 
     s_servo.write(SERVO_OPEN_DEG);
     delay(SERVO_OPEN_SETTLE_MS);
+    vibration_set(VIBRATION_DUTY_DISPENSE);
 
     uint32_t startMs       = millis();
     uint32_t lastScaleMs   = millis();
     uint32_t lastMqttMs    = millis();
     uint32_t lastCurrentMs = millis();
-    uint32_t lastVibMs     = millis();
-    int      vibState      = 0;
     bool     timedOut      = false;
 
     while (true) {
         uint32_t now = millis();
-
-        // Vibrate: toggle servo ±SERVO_VIBRATE_AMP around the open position.
-        if (now - lastVibMs >= SERVO_VIBRATE_INTERVAL_MS) {
-            lastVibMs = now;
-            vibState ^= 1;
-            s_servo.write(SERVO_OPEN_DEG + (vibState ? SERVO_VIBRATE_AMP : -SERVO_VIBRATE_AMP));
-        }
 
         // MQTT keepalive.
         if (now - lastMqttMs >= 200) {
@@ -134,8 +123,6 @@ static bool run_chute(float startW, float weightTarget, uint32_t timeout_ms) {
         }
 
         // Jam detection: check both INA169 current and servo position feedback.
-        // A jam is declared if the servo is drawing excessive current OR has
-        // failed to reach within JAM_POSITION_TOLERANCE_DEG of the open angle.
         if (now - lastCurrentMs >= CURRENT_POLL_INTERVAL_MS) {
             lastCurrentMs = now;
             if (is_jammed(SERVO_OPEN_DEG)) {
@@ -145,7 +132,6 @@ static bool run_chute(float startW, float weightTarget, uint32_t timeout_ms) {
         }
 
         // Scale check (blocks ~800 ms for SCALE_SAMPLES readings).
-        // Vibration pauses during the read — beneficial since movement adds noise.
         if (now - lastScaleMs >= DISPENSE_POLL_INTERVAL_MS) {
             float curW = scale_read_grams();
             lastScaleMs = millis();  // update AFTER the blocking read
@@ -168,6 +154,7 @@ static bool run_chute(float startW, float weightTarget, uint32_t timeout_ms) {
         }
     }
 
+    vibration_set(0);
     s_servo.write(SERVO_CLOSED_DEG);
     delay(SERVO_CLOSE_SETTLE_MS);
 
@@ -183,10 +170,15 @@ void dispenser_init() {
     analogReadResolution(12);
     analogSetPinAttenuation(PIN_CURRENT_SENSE,  ADC_11db);
     analogSetPinAttenuation(PIN_SERVO_FEEDBACK, ADC_11db);
+
+    // Vibration motor — LEDC PWM output, motor off at startup.
+    ledcSetup(VIBRATION_LEDC_CHANNEL, VIBRATION_LEDC_FREQ_HZ, VIBRATION_LEDC_RESOLUTION);
+    ledcAttachPin(PIN_VIBRATION_MOTOR, VIBRATION_LEDC_CHANNEL);
+    vibration_set(0);
 }
 
 void dispenser_run(int weight_g) {
-    float startW = scale_read_grams();
+    float startW    = scale_read_grams();
     bool  haveScale = !isnan(startW);
 
     if (haveScale) {
@@ -228,11 +220,10 @@ void dispenser_empty_hopper() {
     float startW = scale_read_grams();
     run_chute(startW, 0.0f, EMPTY_HOPPER_TIMEOUT_MS);
 
-    // Force hopper to 0% regardless of what the scale now reads (the point of
-    // this command is to empty it, so even a few grams of residue should read 0).
-    s_hopperPct = 0;
+    // Force hopper to 0% regardless of what the scale now reads.
+    s_hopperPct      = 0;
     s_lastDispensedG = 0;
-    s_lastRunOk = true;
+    s_lastRunOk      = true;
     log_i("[dispenser] Empty-hopper complete");
 }
 

@@ -30,3 +30,8 @@ void buttons_init();
 // produce a true result. When true is returned, *outWhich identifies which
 // button fired (if outWhich is non-null).
 bool buttons_poll(ButtonId* outWhich);
+
+// Discard any pending click state on both buttons. Call after a combo-hold
+// action fires so that releasing the buttons doesn't leave a stale half-click
+// that could pair with the next press into an accidental double-click.
+void buttons_cancel();

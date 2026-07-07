@@ -31,14 +31,23 @@ constexpr uint8_t PIN_BUTTON_SNACK = 13;
 // ─── Servo chute angles ───────────────────────────────────────────────────────
 // 0° = chute fully closed.  45° = chute fully open (≈10° physical chute angle
 // due to the linkage geometry — enough for gravity to pull kibble through).
-// During a dispense the servo vibrates ±SERVO_VIBRATE_AMP degrees around the
-// open position to prevent bridging and encourage kibble flow.
-constexpr int SERVO_CLOSED_DEG         = 0;
-constexpr int SERVO_OPEN_DEG           = 45;
-constexpr int SERVO_VIBRATE_AMP        = 1;    // ±1° oscillation amplitude
-constexpr uint32_t SERVO_VIBRATE_INTERVAL_MS = 5;  // toggle every 5 ms → ~100 Hz
-constexpr uint32_t SERVO_OPEN_SETTLE_MS      = 400; // wait after opening before dispense loop
-constexpr uint32_t SERVO_CLOSE_SETTLE_MS     = 400; // wait after closing for kibble to settle
+constexpr int SERVO_CLOSED_DEG              = 0;
+constexpr int SERVO_OPEN_DEG               = 45;
+constexpr uint32_t SERVO_OPEN_SETTLE_MS    = 400; // wait after opening before dispense loop
+constexpr uint32_t SERVO_CLOSE_SETTLE_MS   = 400; // wait after closing for kibble to settle
+
+// ─── Vibration motor (ERM) ───────────────────────────────────────────────────
+// An eccentric rotating mass motor driven via LEDC PWM.  Runs continuously
+// while the chute is open to prevent kibble bridging.
+// Duty cycle is 8-bit (0–255); adjust VIBRATION_DUTY_DISPENSE to taste.
+// JAM_CLEAR_CLOSE_DEG partially closes the servo during clearance; the motor
+// runs at full duty simultaneously to help shake the blockage free.
+constexpr uint8_t  PIN_VIBRATION_MOTOR          = 4;   // adjust to your wiring
+constexpr uint8_t  VIBRATION_LEDC_CHANNEL       = 2;   // avoid conflict with ESP32Servo (uses 0,1)
+constexpr uint32_t VIBRATION_LEDC_FREQ_HZ       = 1000;
+constexpr uint8_t  VIBRATION_LEDC_RESOLUTION    = 8;   // 8-bit → 0–255 duty range
+constexpr uint8_t  VIBRATION_DUTY_DISPENSE      = 180; // ~70% during normal dispensing
+constexpr uint8_t  VIBRATION_DUTY_JAM_CLEAR     = 255; // full power during jam clearance
 
 // ─── Servo position feedback ──────────────────────────────────────────────────
 // The servo's internal potentiometer outputs an analogue voltage proportional to
@@ -100,15 +109,17 @@ constexpr uint32_t DISPENSE_BLINK_OFF_MS = 80;
 
 // ─── Hopper scale (load cells) ───────────────────────────────────────────────
 // Raw HX711 reads averaged per call to smooth load-cell noise (each read blocks
-// ~100 ms at 10 SPS, so 8 samples ≈ 800 ms blocking per scale_read_grams() call).
-constexpr uint8_t SCALE_SAMPLES = 8;
+// ~100 ms at 10 SPS, so 16 samples ≈ 1600 ms blocking per scale_read_grams() call).
+// 16 samples roughly halves the noise vs 8 at the cost of ~800 ms extra latency.
+constexpr uint8_t SCALE_SAMPLES = 16;
 
 // Maximum time to wait for the HX711 before concluding it isn't present.
 constexpr uint32_t SCALE_READY_TIMEOUT_MS = 3000;
 
 // Raw-ADC-counts-per-gram for the wired load cells + HX711. Fixed hardware
 // property — tune once and leave here, not in NVS.
-constexpr float SCALE_CALIBRATION_FACTOR = 420.0f;
+// Derived: 77g actual read as avg 74.7g → 269.5 × (74.7/77) ≈ 261.4
+constexpr float SCALE_CALIBRATION_FACTOR = 261.4f;
 
 // Physical capacity of the hopper in grams when filled to the design line.
 // Used as the 100% reference ONLY when no full-hopper calibration has been
@@ -138,8 +149,14 @@ constexpr uint32_t MQTT_CONNECT_TIMEOUT_MS =  8000;
 // ─── MQTT ────────────────────────────────────────────────────────────────────
 constexpr int MQTT_MAX_PACKET = 1024;
 
+// ─── Scale debug ─────────────────────────────────────────────────────────────
+// When non-zero, the main loop prints a scale reading to Serial every this many
+// milliseconds — useful for verifying load-cell wiring and calibration before
+// the device is provisioned. Set to 0 to disable once testing is done.
+constexpr uint32_t SCALE_DEBUG_INTERVAL_MS = 3000;
+
 // ─── Firmware identity ───────────────────────────────────────────────────────
-constexpr char FIRMWARE_VERSION[] = "2.0.0";
+constexpr char FIRMWARE_VERSION[] = "2.0.1";
 
 // BLE device name prefix — last 4 hex digits of MAC are appended at runtime.
 constexpr char BLE_NAME_PREFIX[] = "Servl-";
