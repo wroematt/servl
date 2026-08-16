@@ -7,21 +7,30 @@ constexpr uint8_t PIN_DIR    = 33;
 constexpr uint8_t PIN_ENABLE = 32;   // active LOW (A4988, DRV8825)
 
 // ── Motion parameters ─────────────────────────────────────────────────────────
-constexpr float   STEPS_PER_REV = 200.0f;  // 200 = 1.8° stepper
-constexpr uint8_t MICROSTEP     = 8;        // match driver MS pin settings
-constexpr float   ACCEL_RPM_S   = 30.0f;   // RPM gained per second during ramp
+constexpr float   STEPS_PER_REV  = 200.0f;  // 200 = 1.8° stepper
+constexpr uint8_t MICROSTEP      = 8;        // match driver MS pin settings
 
-constexpr float    USTEPS_PER_REV   = STEPS_PER_REV * MICROSTEP;
-constexpr float    RPM_START         = 60.0f;
-constexpr float    RPM_MIN           = 5.0f;
-constexpr float    RPM_STEP          = 10.0f;
-constexpr uint32_t ACCEL_INTERVAL_MS = 10;  // ramp tick — speed updated every 10 ms
+constexpr float USTEPS_PER_REV   = STEPS_PER_REV * MICROSTEP;
+
+// Starting values — both are adjustable at runtime via serial commands.
+constexpr float RPM_START         = 60.0f;
+constexpr float ACCEL_RPM_S_START = 30.0f;  // RPM/s ramp rate
+
+// Adjustment step per keypress.
+constexpr float RPM_STEP          = 10.0f;
+constexpr float ACCEL_STEP        = 10.0f;  // RPM/s per [ / ] press
+constexpr float RPM_MIN           = 5.0f;
+constexpr float ACCEL_MIN         = 5.0f;
+
+// How often the ramp tick runs (ms). Lower = smoother ramp, more CPU.
+constexpr uint32_t ACCEL_INTERVAL_MS = 10;
 
 static float    s_rpm          = RPM_START;
+static float    s_accel        = ACCEL_RPM_S_START;  // RPM/s, adjustable
 static int      s_dir          = 1;      // 1 = forward, -1 = reverse
 static bool     s_running      = true;
-static float    s_currentSpeed = 0.0f;  // actual speed sent to driver (usteps/s, signed)
-static float    s_targetSpeed  = 0.0f;  // desired speed (usteps/s, signed)
+static float    s_currentSpeed = 0.0f;  // speed currently sent to driver (signed usteps/s)
+static float    s_targetSpeed  = 0.0f;  // desired speed (signed usteps/s)
 static uint32_t s_lastAccelMs  = 0;
 
 static AccelStepper stepper(AccelStepper::DRIVER, PIN_STEP, PIN_DIR);
@@ -30,9 +39,9 @@ static float rpm_to_sps(float rpm) {
     return (rpm / 60.0f) * USTEPS_PER_REV;
 }
 
-// usteps/s to add or subtract each ramp tick to achieve ACCEL_RPM_S
+// usteps/s to add/subtract per ramp tick to achieve s_accel RPM/s.
 static float accel_per_tick() {
-    return (ACCEL_RPM_S / 60.0f) * USTEPS_PER_REV * (ACCEL_INTERVAL_MS / 1000.0f);
+    return (s_accel / 60.0f) * USTEPS_PER_REV * (ACCEL_INTERVAL_MS / 1000.0f);
 }
 
 static void update_target() {
@@ -40,9 +49,8 @@ static void update_target() {
 }
 
 static void print_status() {
-    Serial.printf("  %.1f RPM  |  %.0f usteps/s  |  ramp %.0f RPM/s  |  %s\n",
-                  s_rpm, rpm_to_sps(s_rpm), ACCEL_RPM_S,
-                  s_dir > 0 ? "forward" : "reverse");
+    Serial.printf("  speed %.1f RPM  |  accel %.0f RPM/s  |  %s\n",
+                  s_rpm, s_accel, s_dir > 0 ? "forward" : "reverse");
 }
 
 void setup() {
@@ -52,7 +60,7 @@ void setup() {
     pinMode(PIN_ENABLE, OUTPUT);
     digitalWrite(PIN_ENABLE, LOW);
 
-    // Set a high ceiling — actual speed is controlled by our ramp below.
+    // Set a generous ceiling — actual speed is controlled by the ramp.
     stepper.setMaxSpeed(rpm_to_sps(300.0f));
 
     update_target();
@@ -65,12 +73,11 @@ void setup() {
     Serial.printf("  %d steps/rev  x%d microstep  =  %.0f usteps/rev\n",
                   (int)STEPS_PER_REV, MICROSTEP, USTEPS_PER_REV);
     Serial.println();
-    Serial.println("  Commands:");
-    Serial.println("    +   speed up 10 RPM");
-    Serial.println("    -   slow down 10 RPM");
-    Serial.println("    r   reverse direction");
-    Serial.println("    s   stop / start toggle");
-    Serial.println("    ?   print current speed");
+    Serial.println("  Speed:        + / = / -");
+    Serial.println("  Acceleration: ] / [");
+    Serial.println("  Reverse:      r");
+    Serial.println("  Stop/start:   s");
+    Serial.println("  Status:       ?");
     Serial.println("────────────────────────────────────────");
     print_status();
     Serial.println();
@@ -79,10 +86,11 @@ void setup() {
 void loop() {
     uint32_t now = millis();
 
-    // ── Ramp s_currentSpeed toward s_targetSpeed each tick ───────────────────
-    // Using runSpeed() + manual ramping rather than AccelStepper's run()/moveTo()
-    // approach, which decelerates as it approaches the target position and causes
-    // audible speed oscillation during continuous rotation.
+    // ── Ramp s_currentSpeed toward s_targetSpeed ──────────────────────────────
+    // runSpeed() + manual ramp is used instead of AccelStepper's run()/moveTo()
+    // because the position-based approach decelerates near the target and causes
+    // speed oscillation during continuous rotation. The ramp applies equally to
+    // start, stop, speed changes, and direction reversals.
     if (now - s_lastAccelMs >= ACCEL_INTERVAL_MS) {
         s_lastAccelMs = now;
         float diff  = s_targetSpeed - s_currentSpeed;
@@ -101,13 +109,16 @@ void loop() {
 
     char c = Serial.read();
     switch (c) {
+        // ── Speed up ─────────────────────────────────────────────────────────
         case '+':
+        case '=':   // = is + without shift
             s_rpm += RPM_STEP;
             update_target();
             Serial.print("Speed up → ");
             print_status();
             break;
 
+        // ── Speed down ───────────────────────────────────────────────────────
         case '-':
             s_rpm = max(RPM_MIN, s_rpm - RPM_STEP);
             update_target();
@@ -115,6 +126,21 @@ void loop() {
             print_status();
             break;
 
+        // ── Accel up ─────────────────────────────────────────────────────────
+        case ']':
+            s_accel += ACCEL_STEP;
+            Serial.print("Accel up → ");
+            print_status();
+            break;
+
+        // ── Accel down ───────────────────────────────────────────────────────
+        case '[':
+            s_accel = max(ACCEL_MIN, s_accel - ACCEL_STEP);
+            Serial.print("Accel down → ");
+            print_status();
+            break;
+
+        // ── Reverse ──────────────────────────────────────────────────────────
         case 'r':
         case 'R':
             s_dir = -s_dir;
@@ -123,6 +149,7 @@ void loop() {
             print_status();
             break;
 
+        // ── Stop / start ─────────────────────────────────────────────────────
         case 's':
         case 'S':
             s_running = !s_running;
